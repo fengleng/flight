@@ -6,6 +6,10 @@ import (
 	"io/ioutil"
 )
 
+const (
+	EXISTCODEINITPROXYSERVER = 1
+)
+
 // Config 整个代理配置文件
 type Config struct {
 	Addr     string       `yaml:"addr"`
@@ -41,6 +45,7 @@ type NodeConfig struct {
 
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+	DbName   string `yaml:"db_name"`
 
 	Master string `yaml:"master"`
 	Slave  string `yaml:"slave"`
@@ -71,6 +76,7 @@ func ParseConfigData(data []byte) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+	cfg.DefaultAuthMethod = mysql.AUTH_NATIVE_PASSWORD
 	return &cfg, nil
 }
 

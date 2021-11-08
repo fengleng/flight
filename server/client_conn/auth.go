@@ -139,24 +139,22 @@ func (c *ClientConn) readHandshakeResponse() error {
 
 	var db string
 	if c.capability&mysql.CLIENT_CONNECT_WITH_DB > 0 {
-		if len(data[pos:]) == 0 {
-			return nil
+		if len(data[pos:]) > 0 {
+			db = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
+			pos += len(c.db) + 1
 		}
-
-		db = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
-		pos += len(c.db) + 1
-
 	}
 	c.db = db
 
-	if c.capability&mysql.CLIENT_PLUGIN_AUTH != 0 {
-		c.authPluginName = string(data[pos : pos+bytes.IndexByte(data[pos:], 0x00)])
-		pos += len(c.authPluginName)
-	} else {
-		// The method used is Native Authentication if both CLIENT_PROTOCOL_41 and CLIENT_SECURE_CONNECTION are set,
-		// but CLIENT_PLUGIN_AUTH is not set, so we fallback to 'mysql_native_password'
-		c.authPluginName = mysql.AUTH_NATIVE_PASSWORD
-	}
+	//if c.capability&mysql.CLIENT_PLUGIN_AUTH != 0 {
+	//	c.authPluginName = string(data[pos : pos+bytes.IndexByte(data[pos:], 0x00)])
+	//	pos += len(c.authPluginName)
+	//} else {
+	//	// The method used is Native Authentication if both CLIENT_PROTOCOL_41 and CLIENT_SECURE_CONNECTION are set,
+	//	// but CLIENT_PLUGIN_AUTH is not set, so we fallback to 'mysql_native_password'
+	//	c.authPluginName = mysql.AUTH_NATIVE_PASSWORD
+	//}
+	c.authPluginName = mysql.AUTH_NATIVE_PASSWORD
 	cont, err := c.handleAuthMatch()
 	if err != nil {
 		return err
