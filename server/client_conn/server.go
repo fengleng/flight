@@ -6,7 +6,6 @@ import (
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/go-mysql-client/mysql"
-	"github.com/fengleng/log"
 	"github.com/pingcap/errors"
 	"net"
 	"os"
@@ -130,7 +129,7 @@ func (s *Server) Run() {
 	for s.running {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			log.Error("server", "Run", err.Error())
+			Log.Error("server, Run %v",err)
 			continue
 		}
 

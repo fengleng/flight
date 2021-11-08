@@ -16,10 +16,10 @@ package chunk
 import (
 	"sort"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/mysql"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/terror"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/types"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/types/json"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/mysql"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/terror"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/types"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/types/json"
 )
 
 // CompareFunc is a function to compare the two values in Row, the two columns must have the same type.

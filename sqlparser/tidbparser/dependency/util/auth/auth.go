@@ -19,7 +19,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/terror"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/terror"
 	"github.com/juju/errors"
 )
 

@@ -3,7 +3,7 @@ package sqlparser
 import (
 	"bytes"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/ast"
+	"github.com/fengleng/flight/sqlparser/tidbparser/ast"
 )
 
 func convertFromCreateTableStmt(stmt *ast.CreateTableStmt, ddl *DDL) Statement {

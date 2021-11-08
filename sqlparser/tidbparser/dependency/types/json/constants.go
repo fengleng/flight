@@ -17,8 +17,8 @@ import (
 	"encoding/binary"
 	"unicode/utf8"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/mysql"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/terror"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/mysql"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/terror"
 )
 
 // TypeCode indicates JSON type.

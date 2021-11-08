@@ -16,8 +16,8 @@ package memory
 import (
 	"sync"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/mysql"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/terror"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/mysql"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/terror"
 )
 
 // ActionOnExceed is the action taken when memory usage exceeds memory quota.

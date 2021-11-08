@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blastrain/vitess-sqlparser/bytes2"
-	"github.com/blastrain/vitess-sqlparser/sqltypes"
+	"github.com/fengleng/flight/sqlparser/bytes2"
+	"github.com/fengleng/flight/sqlparser/sqltypes"
 )
 
 const eofChar = 0x100

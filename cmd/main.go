@@ -11,10 +11,12 @@ import (
 var configFile = flag.String("config", "etc/flight.yaml", "kingshard config file")
 
 func main() {
+
 	if len(*configFile) == 0 {
 		StdLog.Error("must use a config file")
 		return
 	}
+
 	cfg, err := config.ParseConfigFile(*configFile)
 	if err != nil {
 		StdLog.Error("ParseConfigFile:%s %v", *configFile, err)
@@ -22,8 +24,5 @@ func main() {
 	}
 	proxyServer := client_conn.NewServer(cfg)
 	proxyServer.Run()
-	//if err != nil {
-	//	StdLog.Error("err:%v", err)
-	//	os.Exit(1)
-	//}
+
 }

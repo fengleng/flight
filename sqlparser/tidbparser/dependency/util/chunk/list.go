@@ -14,8 +14,8 @@
 package chunk
 
 import (
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/types"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/util/memory"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/types"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/util/memory"
 	"github.com/juju/errors"
 )
 

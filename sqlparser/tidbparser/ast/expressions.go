@@ -20,10 +20,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/model"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/mysql"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/types"
-	"github.com/blastrain/vitess-sqlparser/tidbparser/parser/opcode"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/model"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/mysql"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/types"
+	"github.com/fengleng/flight/sqlparser/tidbparser/parser/opcode"
 )
 
 var (

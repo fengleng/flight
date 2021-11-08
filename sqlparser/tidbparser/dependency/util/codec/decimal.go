@@ -16,7 +16,7 @@ package codec
 import (
 	"fmt"
 
-	"github.com/blastrain/vitess-sqlparser/tidbparser/dependency/types"
+	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/types"
 	"github.com/juju/errors"
 )
 

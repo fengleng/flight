@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blastrain/vitess-sqlparser/sqltypes"
-	tidbparser "github.com/blastrain/vitess-sqlparser/tidbparser/parser"
+	"github.com/fengleng/flight/sqlparser/sqltypes"
+	tidbparser "github.com/fengleng/flight/sqlparser/tidbparser/parser"
 )
 
 // Instructions for creating new types: If a type
