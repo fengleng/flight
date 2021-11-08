@@ -28,6 +28,7 @@ type logCfg struct {
 	seq        string
 
 	service string
+	skip    int
 }
 
 var (
@@ -58,9 +59,12 @@ func init() {
 		logLevel:       INFO,
 		logChannelSize: 50000,
 		seq:            seq,
+		skip:           defaultSkip,
 	}
-	StdLog = NewConsoleLogger()
-	Log = NewFileLogger()
+	StdLog = NewConsoleLogger(CfgOptionSkip(3))
+	Log = NewFileLogger(CfgOptionSkip(3))
+	//StdLog = NewConsoleLogger()
+	//Log = NewFileLogger()
 }
 
 type CfgOption func(opt *logCfg)
@@ -98,5 +102,11 @@ func CfgOptionService(service string) CfgOption {
 func CfgOptionChannelSize(logChannelSize int) CfgOption {
 	return func(opt *logCfg) {
 		opt.logChannelSize = logChannelSize
+	}
+}
+
+func CfgOptionSkip(skip int) CfgOption {
+	return func(opt *logCfg) {
+		opt.skip = skip
 	}
 }

@@ -14,6 +14,8 @@ func TestT2(t *testing.T) {
 	//g := NewConsoleLogger()
 	g.Error("dfsafasf")
 
+	StdLog.Fatal("sdfsadfas")
+
 	go func() {
 		for {
 			time.Sleep(time.Second)

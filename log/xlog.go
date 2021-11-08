@@ -49,7 +49,7 @@ func newXLog(cfg *logCfg) *XLog {
 
 	x := &XLog{
 		level:       cfg.logLevel,
-		skip:        defaultSkip,
+		skip:        cfg.skip,
 		service:     cfg.service,
 		hostname:    hostname,
 		logTextChan: make(chan string, cfg.logChannelSize),
