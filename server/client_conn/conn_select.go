@@ -93,7 +93,7 @@ func (c *ClientConn) mergeSelectResult(rs []*mysql.Result, stmt *sqlparser.Selec
 		return err
 	}
 
-	c.sortSelectResult(r.Resultset, stmt)
+	_ = c.sortSelectResult(r.Resultset, stmt)
 	//to do, add log here, sort may error because order by key not exist in resultset fields
 
 	if err := c.limitSelectResult(r.Resultset, stmt); err != nil {
@@ -163,14 +163,14 @@ func (c *ClientConn) limitSelectResult(r *mysql.Resultset, stmt *sqlparser.Selec
 }
 
 func (c *ClientConn) buildFuncExprResult(stmt *sqlparser.Select,
-	rs []*mysql.Result, funcExprs map[int]string) (*mysql.Resultset, error) {
+	rs []*mysql.Result, funcExprList map[int]string) (*mysql.Resultset, error) {
 
 	var names []string
 	var err error
 	r := rs[0].Resultset
 	funcExprValues := make(map[int]interface{})
 
-	for index, funcName := range funcExprs {
+	for index, funcName := range funcExprList {
 		funcExprValue, err := c.calFuncExprValue(
 			funcName,
 			rs,
@@ -503,7 +503,7 @@ func (c *ClientConn) getMinFuncExprValue(
 	return min, nil
 }
 
-//calculate the the value funcExpr(sum or count)
+//calculate  the value funcExpr(sum or count)
 func (c *ClientConn) calFuncExprValue(funcName string,
 	rs []*mysql.Result, index int) (interface{}, error) {
 
