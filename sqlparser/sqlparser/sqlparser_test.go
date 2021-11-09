@@ -25,7 +25,9 @@ func TestDropTableParsing(t *testing.T) {
 
 func TestSelectParsing(t *testing.T) {
 	sta, err := Parse(`SELECT *,count(id) from users where id = 1 order by created_at limit 1 offset 3`)
+	sta2, err := Parse(`select * from qrfm_daily_static left join clientlog_client_log_task cclt on qrfm_daily_static.app_id = cclt.app_id where qrfm_daily_static.id = cclt.id;`)
 	t.Log(sta)
+	t.Log(sta2)
 	checkErr(t, err)
 }
 

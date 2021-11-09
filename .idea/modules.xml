@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/flight.iml" filepath="$PROJECT_DIR$/.idea/flight.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../sqlparser/.idea/sqlparser.iml" filepath="$PROJECT_DIR$/../sqlparser/.idea/sqlparser.iml" />
     </modules>
   </component>
 </project>
