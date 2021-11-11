@@ -46,5 +46,5 @@ schema_list:
         table:
           name: flight_table1
           locations: [4,4]
-          childred:
+          children:
             -
