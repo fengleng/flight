@@ -2,6 +2,7 @@ package schema
 
 import (
 	"github.com/fengleng/flight/config"
+	"github.com/fengleng/flight/server/backend_node"
 	"github.com/juju/errors"
 )
 
@@ -12,7 +13,8 @@ type Schema struct {
 
 	NodeMap map[string]*config.NodeConfig
 	RuleMap map[string]*config.RuleConfig
-	//NodeMap map[string]*config.NodeConfig
+
+	BackendNode map[string]*backend_node.Node
 }
 
 func ParseSchemaList(cfgList []config.SchemaConfig) (map[string]*Schema, error) {
@@ -48,6 +50,12 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 			return nil, err
 		}
 		schema.NodeMap[nodeCfg.Name] = &nodeCfg
+	}
+
+	if backendMap, err := backend_node.ParseNodeList(cfg.NodeList); err != nil {
+		return nil, errors.Trace(err)
+	} else {
+		schema.BackendNode = backendMap
 	}
 
 	schema.RuleMap = make(map[string]*config.RuleConfig)

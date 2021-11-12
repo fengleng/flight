@@ -1,12 +1,10 @@
 package config
 
 import (
+	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-)
-import (
-	. "github.com/fengleng/flight/log"
 )
 
 type Config struct {

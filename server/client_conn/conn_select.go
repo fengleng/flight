@@ -2,7 +2,7 @@ package client_conn
 
 import (
 	"fmt"
-	"github.com/fengleng/flight/server/errors"
+	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/util/hack"
 	"github.com/fengleng/go-mysql-client/mysql"
@@ -211,7 +211,7 @@ func (c *ClientConn) buildResultset(fields []*mysql.Field, names []string, value
 		if len(r.Fields) == len(fields) {
 			ExistFields = true
 		} else {
-			return nil, errors.ErrInvalidArgument
+			return nil, my_errors.ErrInvalidArgument
 		}
 	}
 
@@ -380,7 +380,7 @@ func (c *ClientConn) getSumFuncExprValue(rs []*mysql.Result,
 
 				sumf = sumf + tmp
 			default:
-				return nil, errors.ErrSumColumnType
+				return nil, my_errors.ErrSumColumnType
 			}
 		}
 	}

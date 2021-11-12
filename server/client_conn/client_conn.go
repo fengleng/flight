@@ -3,6 +3,7 @@ package client_conn
 import (
 	"fmt"
 	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/server"
 	"github.com/fengleng/go-common/core/hack"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
@@ -14,7 +15,7 @@ type ClientConn struct {
 	c   net.Conn
 	pkg *mysql.PacketIO
 
-	proxy *Server
+	proxy *server.Server
 
 	connectionId uint32
 	status       uint16
@@ -41,7 +42,7 @@ var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_F
 
 var baseConnId uint32 = 10000
 
-func NewClientConn(co net.Conn, s *Server) *ClientConn {
+func NewClientConn(co net.Conn, s *server.Server) *ClientConn {
 	c := new(ClientConn)
 	tcpConn := co.(*net.TCPConn)
 
@@ -72,11 +73,11 @@ func NewClientConn(co net.Conn, s *Server) *ClientConn {
 	return c
 }
 
-func (c *ClientConn) SetProxyServer(s *Server) {
-	c.proxy = s
-	c.charset = s.Cfg.Charset
-	c.collation = s.Cfg.Collation
-}
+//func (c *ClientConn) SetProxyServer(s *Server) {
+//	c.proxy = s
+//	c.charset = s.Cfg.Charset
+//	c.collation = s.Cfg.Collation
+//}
 
 func (c *ClientConn) writeOK(r *mysql.Result) error {
 	if r == nil {
@@ -168,6 +169,12 @@ func (c *ClientConn) Run() {
 		_ = c.Close()
 	}()
 	defer c.clean()
+	if err := c.Handshake(); err != nil {
+		Log.Error("err:%v", err)
+		_ = c.writeError(mysql.NewDefaultError(mysql.ER_DBACCESS_DENIED_ERROR, c.user, c.db))
+		return
+	}
+
 	for {
 		if data, err := c.readPacket(); err != nil {
 			Log.Error("%v", errors.AddStack(err))

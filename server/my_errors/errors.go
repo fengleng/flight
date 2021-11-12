@@ -1,4 +1,4 @@
-package errors
+package my_errors
 
 import "github.com/pingcap/errors"
 

@@ -28,6 +28,11 @@ node_list:
     #
     down_after_noalive: 32
 
+#schema_list:
+#  -
+#    defaut_node: node1
+#    schema_name: flight
+
 default_node: node1
 
 schema_name: flight

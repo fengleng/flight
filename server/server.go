@@ -1,17 +1,16 @@
-package client_conn
+package server
 
 import (
 	"crypto/tls"
 	"github.com/fengleng/flight/config"
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/backend_node"
+	"github.com/fengleng/flight/server/client_conn"
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
 	"net"
-	"os"
 	"sync"
-	"time"
 )
 
 type Server struct {
@@ -20,15 +19,18 @@ type Server struct {
 	PubKey []byte
 	TlsCfg *tls.Config
 
+	SchemaMap map[string]*schema.Schema
+
 	BackEndNode map[string]*backend_node.Node
 
 	CacheShaPassword *sync.Map // 'user@host' -> SHA256(SHA256(PASSWORD))
 	running          bool
 
-	listener net.Listener
+	Listener net.Listener
 }
 
-func NewServer(cfg *config.Config) (*Server,error) {
+func NewServer(cfg *config.Config) (*Server, error) {
+	var err error
 	s := new(Server)
 	s.Cfg = cfg
 	s.Users = make(map[string]string)
@@ -36,68 +38,34 @@ func NewServer(cfg *config.Config) (*Server,error) {
 		s.Users[userConfig.User] = userConfig.Password
 	}
 
-	if err := s.parseCharset(cfg);err != nil {
-		return nil,errors.Trace(err)
+	if err := s.parseCharset(cfg); err != nil {
+		return nil, errors.Trace(err)
 	}
-	s.BackEndNode,err := s.parseNodes(cfg.SchemaList)
 
-	s.listener, err = net.Listen("tcp", cfg.Addr)
+	if err := s.parseSchemaList(cfg.SchemaList); err != nil {
+		return nil, errors.Trace(err)
+	}
 
-	if err != nil {
-		return nil,errors.Trace(err)
+	if s.listener, err = net.Listen("tcp", cfg.Addr); err != nil {
+		return nil, errors.Trace(err)
 	}
 
 	StdLog.Info("server running:%v", cfg.Addr)
-	return s,nil
+	return s, nil
 }
 
+func (s *Server) parseSchemaList(cfgList []config.SchemaConfig) error {
 
-
-
-func (s *Server) parseSchemaList(cfgList []config.SchemaConfig) (map[string]*backend_node.Node,error) {
-	backendNode := make(map[string]*schema.Schema)
-
-	for _, schemaConfig := range cfgList {
-
+	if schemaMap, err := schema.ParseSchemaList(cfgList); err != nil {
+		return errors.Trace(err)
+	} else {
+		s.SchemaMap = schemaMap
 	}
-	for _, v := range cfg.Nodes {
-		_, ok := backendNode[v.Name]
-		if ok {
-			StdLog.Error("duplicate node [%s]", v.Name)
-			os.Exit(config.EXISTCODEINITPROXYSERVER)
-		}
-		node, err := parseNode(v)
-		if err != nil {
-			StdLog.Error("err:%v", err)
-			os.Exit(config.EXISTCODEINITPROXYSERVER)
-		}
-		backendNode[v.Name] = node
-	}
-	return backendNode
+
+	return nil
 }
 
-func parseNode(cfg config.NodeConfig) (*backend_node.Node, error) {
-	var err error
-	n := new(backend_node.Node)
-	n.Cfg = cfg
-
-	n.DownAfterNoAlive = time.Duration(cfg.DownAfterNoAlive) * time.Second
-	err = n.ParseMaster(cfg.Master)
-	if err != nil {
-		return nil, err
-	}
-	err = n.ParseSlave(cfg.Slave)
-	if err != nil {
-		return nil, err
-	}
-
-	n.Online = true
-	//go n.CheckNode()
-
-	return n, nil
-}
-
-func (s *Server) parseCharset(cfg *config.Config) (err error){
+func (s *Server) parseCharset(cfg *config.Config) (err error) {
 	var charset = mysql.DEFAULT_CHARSET
 	if cfg.Charset != "" {
 		charset = cfg.Charset
@@ -123,8 +91,8 @@ func (s *Server) parseCharset(cfg *config.Config) (err error){
 	return nil
 }
 
-func (s *Server) newClientConn(co net.Conn) *ClientConn {
-	conn := NewClientConn(co, s)
+func (s *Server) newClientConn(co net.Conn) *client_conn.ClientConn {
+	conn := client_conn.NewClientConn(co, s)
 	//conn.SetProxyServer(s)
 	return conn
 }
@@ -136,9 +104,9 @@ func (s *Server) Run() {
 	//go s.flushCounter()
 
 	for s.running {
-		conn, err := s.listener.Accept()
+		conn, err := s.Listener.Accept()
 		if err != nil {
-			Log.Error("server, Run %v",err)
+			Log.Error("server, Run %v", err)
 			continue
 		}
 

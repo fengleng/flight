@@ -4,7 +4,7 @@ import (
 	"flag"
 	"github.com/fengleng/flight/config"
 	. "github.com/fengleng/flight/log"
-	"github.com/fengleng/flight/server/client_conn"
+	"github.com/fengleng/flight/server/proxy"
 )
 
 //flight
@@ -16,13 +16,21 @@ func main() {
 		StdLog.Error("must use a config file")
 		return
 	}
-
-	cfg, err := config.ParseConfig(*configFile)
-	if err != nil {
+	var err error
+	var cfg *config.Config
+	if cfg, err = config.ParseConfig(*configFile); err != nil {
 		StdLog.Error("ParseConfigFile:%s %v", *configFile, err)
 		return
 	}
-	proxyServer, err := client_conn.NewServer(cfg)
-	proxyServer.Run()
+
+	var proxySrv *proxy.Proxy
+	if proxySrv, err = proxy.NewProxy(cfg); err != nil {
+		Log.Error("NewProxy %v", err)
+		return
+	}
+	if err := proxySrv.Run(); err != nil {
+		Log.Error("proxySrv.Run %v", err)
+		return
+	}
 
 }
