@@ -75,6 +75,12 @@ func OutPutCfgOption(t OutputType) CfgOption {
 	}
 }
 
+func LogLevelCfgOption(l Level) CfgOption {
+	return func(opt *logCfg) {
+		opt.logLevel = l
+	}
+}
+
 func CfgOptionWC(wc io.WriteCloser) CfgOption {
 	return func(opt *logCfg) {
 		opt.wc = wc

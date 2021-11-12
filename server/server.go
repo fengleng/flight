@@ -5,7 +5,6 @@ import (
 	"github.com/fengleng/flight/config"
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/backend_node"
-	"github.com/fengleng/flight/server/client_conn"
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
@@ -46,7 +45,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	if s.listener, err = net.Listen("tcp", cfg.Addr); err != nil {
+	if s.Listener, err = net.Listen("tcp", cfg.Addr); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -91,41 +90,41 @@ func (s *Server) parseCharset(cfg *config.Config) (err error) {
 	return nil
 }
 
-func (s *Server) newClientConn(co net.Conn) *client_conn.ClientConn {
-	conn := client_conn.NewClientConn(co, s)
-	//conn.SetProxyServer(s)
-	return conn
-}
+//func (s *Server) newClientConn(co net.Conn) *client_conn.ClientConn {
+//	conn := client_conn.NewClientConn(co, s)
+//	//conn.SetProxyServer(s)
+//	return conn
+//}
 
-func (s *Server) Run() {
-	s.running = true
+//func (s *Server) Run() {
+//	s.running = true
+//
+//	// flush counter
+//	//go s.flushCounter()
+//
+//	for s.running {
+//		conn, err := s.Listener.Accept()
+//		if err != nil {
+//			Log.Error("server, Run %v", err)
+//			continue
+//		}
+//
+//		go s.onConn(conn)
+//	}
+//}
 
-	// flush counter
-	//go s.flushCounter()
-
-	for s.running {
-		conn, err := s.Listener.Accept()
-		if err != nil {
-			Log.Error("server, Run %v", err)
-			continue
-		}
-
-		go s.onConn(conn)
-	}
-}
-
-func (s *Server) onConn(co net.Conn) {
-	defer func() {
-		r := recover()
-		if err, ok := r.(error); ok {
-			Log.Error("%v", errors.AddStack(err))
-		}
-	}()
-
-	conn := s.newClientConn(co)
-	if err := conn.Handshake(); err != nil {
-		Log.Error("err:%v", err)
-		return
-	}
-	conn.Run()
-}
+//func (s *Server) onConn(co net.Conn) {
+//	defer func() {
+//		r := recover()
+//		if err, ok := r.(error); ok {
+//			Log.Error("%v", errors.AddStack(err))
+//		}
+//	}()
+//
+//	conn := s.newClientConn(co)
+//	if err := conn.Handshake(); err != nil {
+//		Log.Error("err:%v", err)
+//		return
+//	}
+//	conn.Run()
+//}

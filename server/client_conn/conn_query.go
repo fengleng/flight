@@ -29,7 +29,7 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 		return mysql.NewDefaultError(mysql.ER_PARSE_ERROR)
 	}
 	Log.Info("%v", vv)
-	node := c.proxy.BackEndNode["biz"]
+	node := c.srv.BackEndNode["biz"]
 
 	result, err := node.Master.Execute(sql)
 	if err != nil {

@@ -15,7 +15,7 @@ type ClientConn struct {
 	c   net.Conn
 	pkg *mysql.PacketIO
 
-	proxy *server.Server
+	srv *server.Server
 
 	connectionId uint32
 	status       uint16
@@ -69,7 +69,7 @@ func NewClientConn(co net.Conn, s *server.Server) *ClientConn {
 
 	//c.stmtId = 0
 	//c.stmts = make(map[uint32]*Stmt)
-	c.proxy = s
+	c.srv = s
 	return c
 }
 

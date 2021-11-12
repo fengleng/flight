@@ -173,11 +173,11 @@ func (c *ClientConn) handleAuthMatch() (bool, error) {
 	// if the client responds the handshake with a different auth method, the server will send the AuthSwitchRequest packet
 	// to the client to ask the client to switch.
 
-	if c.authPluginName != c.proxy.Cfg.DefaultAuthMethod {
-		if err := c.writeAuthSwitchRequest(c.proxy.Cfg.DefaultAuthMethod); err != nil {
+	if c.authPluginName != c.srv.Cfg.DefaultAuthMethod {
+		if err := c.writeAuthSwitchRequest(c.srv.Cfg.DefaultAuthMethod); err != nil {
 			return false, err
 		}
-		c.authPluginName = c.proxy.Cfg.DefaultAuthMethod
+		c.authPluginName = c.srv.Cfg.DefaultAuthMethod
 		// handle AuthSwitchResponse
 		return false, c.handleAuthSwitchResponse()
 	}
@@ -190,7 +190,7 @@ func (c *ClientConn) compareAuthData(authPluginName string, clientAuthData []byt
 		//if err := c.acquirePassword(); err != nil {
 		//	return err
 		//}
-		return c.compareNativePasswordAuthData(clientAuthData, c.proxy.Users[c.user])
+		return c.compareNativePasswordAuthData(clientAuthData, c.srv.Users[c.user])
 
 	case mysql.AUTH_CACHING_SHA2_PASSWORD:
 		if err := c.compareCacheSha2PasswordAuthData(clientAuthData); err != nil {
@@ -212,7 +212,7 @@ func (c *ClientConn) compareAuthData(authPluginName string, clientAuthData []byt
 		if !cont {
 			return nil
 		}
-		return c.compareSha256PasswordAuthData(clientAuthData, c.proxy.Users[c.user])
+		return c.compareSha256PasswordAuthData(clientAuthData, c.srv.Users[c.user])
 
 	default:
 		return errors.Errorf("unknown authentication plugin name '%s'", authPluginName)
@@ -243,7 +243,7 @@ func (c *ClientConn) compareSha256PasswordAuthData(clientAuthData []byte, passwo
 	} else {
 		// client should send encrypted password
 		// decrypt
-		dbytes, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, (c.proxy.TlsCfg.Certificates[0].PrivateKey).(*rsa.PrivateKey), clientAuthData, nil)
+		dbytes, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, (c.srv.TlsCfg.Certificates[0].PrivateKey).(*rsa.PrivateKey), clientAuthData, nil)
 		if err != nil {
 			return err
 		}
@@ -296,7 +296,7 @@ func (c *ClientConn) handlePublicKeyRetrieval(authData []byte) (bool, error) {
 func (c *ClientConn) writeAuthMoreDataPubkey() error {
 	data := make([]byte, 4)
 	data = append(data, mysql.MORE_DATE_HEADER)
-	data = append(data, c.proxy.PubKey...)
+	data = append(data, c.srv.PubKey...)
 	return c.writePacket(data)
 }
 
@@ -330,7 +330,7 @@ func (c *ClientConn) handleAuthSwitchResponse() error {
 		//if err := c.acquirePassword(); err != nil {
 		//	return err
 		//}
-		if !bytes.Equal(mysql.CalcPassword(c.salt, []byte(c.proxy.Users[c.user])), authData) {
+		if !bytes.Equal(mysql.CalcPassword(c.salt, []byte(c.srv.Users[c.user])), authData) {
 			return mysql.NewError(mysql.ER_ACCESS_DENIED_ERROR, fmt.Sprintf("user:%s", c.user))
 		}
 		return nil
@@ -365,7 +365,7 @@ func (c *ClientConn) handleAuthSwitchResponse() error {
 		//if err := c.acquirePassword(); err != nil {
 		//	return err
 		//}
-		return c.compareSha256PasswordAuthData(authData, c.proxy.Users[c.user])
+		return c.compareSha256PasswordAuthData(authData, c.srv.Users[c.user])
 
 	default:
 		return errors.Errorf("unknown authentication plugin name '%s'", c.authPluginName)
@@ -411,7 +411,7 @@ func (c *ClientConn) compareCacheSha2PasswordAuthData(clientAuthData []byte) err
 		//if err := c.acquirePassword(); err != nil {
 		//	return err
 		//}
-		if c.proxy.Users[c.user] == "" {
+		if c.srv.Users[c.user] == "" {
 			return nil
 		}
 		return ErrAccessDenied
@@ -432,7 +432,7 @@ func (c *ClientConn) compareCacheSha2PasswordAuthData(clientAuthData []byte) err
 	//	return errAccessDenied(c.password)
 	//}
 	// other type of credential provider, we use the cache
-	cached, ok := c.proxy.CacheShaPassword.Load(fmt.Sprintf("%s@%s", c.user, c.c.LocalAddr()))
+	cached, ok := c.srv.CacheShaPassword.Load(fmt.Sprintf("%s@%s", c.user, c.c.LocalAddr()))
 	if ok {
 		// Scramble validation
 		if scrambleValidation(cached.([]byte), c.salt, clientAuthData) {
@@ -440,7 +440,7 @@ func (c *ClientConn) compareCacheSha2PasswordAuthData(clientAuthData []byte) err
 			return c.writeAuthMoreDataFastAuth()
 		}
 
-		return errAccessDenied(c.proxy.Users[c.user])
+		return errAccessDenied(c.srv.Users[c.user])
 	}
 	// cache miss, do full auth
 	if err := c.writeAuthMoreDataFullAuth(); err != nil {
@@ -477,10 +477,10 @@ func (c *ClientConn) handleCachingSha2PasswordFullAuth(authData []byte) error {
 		if l := len(authData); l != 0 && authData[l-1] == 0x00 {
 			authData = authData[:l-1]
 		}
-		if bytes.Equal(authData, []byte(c.proxy.Users[c.user])) {
+		if bytes.Equal(authData, []byte(c.srv.Users[c.user])) {
 			return nil
 		}
-		return errAccessDenied(c.proxy.Users[c.user])
+		return errAccessDenied(c.srv.Users[c.user])
 	} else {
 		// client either request for the public key or send the encrypted password
 		if len(authData) == 1 && authData[0] == 0x02 {
@@ -496,12 +496,12 @@ func (c *ClientConn) handleCachingSha2PasswordFullAuth(authData []byte) error {
 		}
 		// the encrypted password
 		// decrypt
-		dbytes, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, (c.proxy.TlsCfg.Certificates[0].PrivateKey).(*rsa.PrivateKey), authData, nil)
+		dbytes, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, (c.srv.TlsCfg.Certificates[0].PrivateKey).(*rsa.PrivateKey), authData, nil)
 		if err != nil {
 			return err
 		}
-		plain := make([]byte, len(c.proxy.Users[c.user])+1)
-		copy(plain, c.proxy.Users[c.user])
+		plain := make([]byte, len(c.srv.Users[c.user])+1)
+		copy(plain, c.srv.Users[c.user])
 		for i := range plain {
 			j := i % len(c.salt)
 			plain[i] ^= c.salt[j]
@@ -509,23 +509,23 @@ func (c *ClientConn) handleCachingSha2PasswordFullAuth(authData []byte) error {
 		if bytes.Equal(plain, dbytes) {
 			return nil
 		}
-		return errAccessDenied(c.proxy.Users[c.user])
+		return errAccessDenied(c.srv.Users[c.user])
 	}
 }
 
 func (c *ClientConn) writeCachingSha2Cache() {
 	// write cache
-	if c.proxy.Users[c.user] == "" {
+	if c.srv.Users[c.user] == "" {
 		return
 	}
 	// SHA256(PASSWORD)
 	crypt := sha256.New()
-	crypt.Write([]byte(c.proxy.Users[c.user]))
+	crypt.Write([]byte(c.srv.Users[c.user]))
 	m1 := crypt.Sum(nil)
 	// SHA256(SHA256(PASSWORD))
 	crypt.Reset()
 	crypt.Write(m1)
 	m2 := crypt.Sum(nil)
 	// caching_sha2_password will maintain an in-memory hash of `user`@`host` => SHA256(SHA256(PASSWORD))
-	c.proxy.CacheShaPassword.Store(fmt.Sprintf("%s@%s", c.user, c.c.LocalAddr()), m2)
+	c.srv.CacheShaPassword.Store(fmt.Sprintf("%s@%s", c.user, c.c.LocalAddr()), m2)
 }

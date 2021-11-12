@@ -63,7 +63,7 @@ func (n *Node) ParseMaster(masterStr string) error {
 	if len(masterStr) == 0 {
 		return my_errors.ErrNoMasterConn
 	}
-	master, err := backend.Open(masterStr, n.Cfg.User, n.Cfg.Password, n.Cfg.Name)
+	master, err := backend.Open(masterStr, n.Cfg.User, n.Cfg.Password, "")
 	n.Master = master
 
 	return err

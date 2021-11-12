@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"github.com/fengleng/go-common/fileutil"
 	"os"
 )
@@ -10,7 +9,7 @@ func NewFileLogger(opts ...CfgOption) Logger {
 	cfg := defaultLogCfg
 
 	//cfg := &dcfg
-	fmt.Println(dir)
+	//fmt.Println(dir)
 
 	for _, f := range opts {
 		f(cfg)

@@ -9,7 +9,7 @@ log_level: INFO
 #
 schema_path:
   -
-    ../etc/schema/schema_test1.yaml
+    ./etc/schema/schema_test1.yaml
 
 #log_path:
 

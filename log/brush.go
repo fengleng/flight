@@ -14,7 +14,7 @@ func NewBrush(color string) Brush {
 
 var colors = []Brush{
 	NewBrush("1;36"), // debug			cyan
-	NewBrush("1;34"), // info
+	NewBrush("1;32"), // info
 	NewBrush("1;33"), // warn    yellow
 	NewBrush("1;31"), // error      red
 	NewBrush("1;35"), // fatal   magenta

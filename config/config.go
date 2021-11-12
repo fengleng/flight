@@ -11,8 +11,9 @@ type Config struct {
 	Addr     string `yaml:"addr"`
 	LogLevel string `yaml:"log_level"`
 
-	Charset     string            `yaml:"charset"`
-	CollationId mysql.CollationId `yaml:"collation_id"`
+	Charset           string            `yaml:"charset"`
+	CollationId       mysql.CollationId `yaml:"collation_id"`
+	DefaultAuthMethod string            `yaml:"default_auth_method"`
 
 	SchemaPath []string     `yaml:"schema_path"`
 	LogPath    string       `yaml:"log_path"`

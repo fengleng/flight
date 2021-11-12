@@ -29,6 +29,7 @@ func (p *Proxy) Run() error {
 	if p.running {
 		return errors.Errorf("flight proxy[%s] is running", p.Server.Cfg.Addr)
 	}
+	p.running = true
 	for {
 		conn, err := p.Server.Listener.Accept()
 		if err != nil {
