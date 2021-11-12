@@ -26,7 +26,8 @@ user_list:
 ##HTTP Basic Auth
 #web_user : admin
 #web_password : admin
-
+default_auth_method: mysql_native_password
+#mysql_native_password
 # if set log_path, the sql log will write into log_path/sql.log,the system log
 # will write into log_path/sys.log
 #log_path : /Users/flike/log
