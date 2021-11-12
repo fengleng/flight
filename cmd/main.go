@@ -17,12 +17,12 @@ func main() {
 		return
 	}
 
-	cfg, err := config.ParseConfigFile(*configFile)
+	cfg, err := config.ParseConfig(*configFile)
 	if err != nil {
 		StdLog.Error("ParseConfigFile:%s %v", *configFile, err)
 		return
 	}
-	proxyServer := client_conn.NewServer(cfg)
+	proxyServer, err := client_conn.NewServer(cfg)
 	proxyServer.Run()
 
 }

@@ -1,7 +1,6 @@
-package config
+package cfg
 
 import (
-	"github.com/fengleng/go-mysql-client/mysql"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 )
@@ -10,12 +9,8 @@ import (
 )
 
 type Config struct {
-	Addr     string `yaml:"addr"`
-	LogLevel string `yaml:"log_level"`
-
-	Charset     string            `yaml:"charset"`
-	CollationId mysql.CollationId `yaml:"collation_id"`
-
+	Addr       string       `yaml:"addr"`
+	LogLevel   string       `yaml:"log_level"`
 	SchemaPath []string     `yaml:"schema_path"`
 	LogPath    string       `yaml:"log_path"`
 	UserList   []UserConfig `yaml:"user_list"`
@@ -23,12 +18,14 @@ type Config struct {
 }
 
 type SchemaConfig struct {
+	//UserList []UserConfig `yaml:"user_list"`
 	NodeList   []NodeConfig `yaml:"node_list"`
 	SchemaName string       `yaml:"schema_name"`
-
+	//NodeList []NodeConfig `yaml:"node_list"`
 	DefaultNode string `yaml:"default_node"`
 
 	RuleList []RuleConfig `yaml:"rule_list"`
+	//TableList []TableConfig `yaml:"table_list"`
 }
 
 type RuleConfig struct {

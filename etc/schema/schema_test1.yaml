@@ -1,17 +1,19 @@
 
-user_list:
-  -
-    user: root
-    password: root
-  -
-    user: root1
-    password: root1
+#user_list:
+#  -
+#    user: root
+#    password: root
+#  -
+#    user: root1
+#    password: root1
+
 
 node_list:
   -
     name: node1
     max_conns_limit : 32
     user: root
+    password: root
     master: 127.0.0.1:3306
     slave_list: [127.0.0.1:3307,127.0.0.1:3308]
 #
@@ -20,31 +22,57 @@ node_list:
     name: node2
     max_conns_limit: 32
     user: root
+    password: root
     master: 127.0.0.1:3306
-    slave_list: [127.0.0.1:3307,127.0.0.1:3308 ]
+    slave_list: [127.0.0.1:3307,127.0.0.1:3308]
     #
     down_after_noalive: 32
 
+default_node: node1
 
-schema_list:
-  -
-    name: flight1
-    node_list:
-      -
-        node1
-        node2
-    default_node: node1
-    table_list:
-      -
-        flight_table1
-        flight_table2
+schema_name: flight
 
-    rule_list:
-      -
-        type: mod
-        key: id
-        table:
-          name: flight_table1
-          locations: [4,4]
-          children:
-            -
+table_list:
+  - flight_table1
+  - flight_table2
+  - flight_table3
+
+rule_list:
+  - table_name: flight_table1
+    key: id
+    type: mod
+    location: [1,1]
+    child_table_list:
+      - associated_key: ff1
+        table_name: flight_table2
+#  rule:
+#    key: id
+#    type: mod
+#    location: [ 1,1 ]
+#    child_table_list:
+#      - associated_key: ff1
+#        table_name: flight_table2
+
+
+#schema_name: flight1
+##node_list: [node1,node2]
+#default_node: node1
+#table_list:
+#schema_list:
+#  -
+#    schema_name: flight1
+#    node_list: [node1,node2]
+#    default_node: node1
+#    table_list:
+#      -
+#        table_name: flight_table1
+#        rule:
+#          key: id
+#          type: mod
+#          location: [1,1]
+#          child_table_list:
+#            -
+#              associated_key: ff1
+#              table_name: flight_table2
+#      -
+#        table_name: flight_table1

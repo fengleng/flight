@@ -1,5 +1,4 @@
 # server listen addr
-#addr: 0.0.0.0:9999
 addr: 0.0.0.0:9999
 # prometheus server listen addr
 #prometheus_addr : 0.0.0.0:7080

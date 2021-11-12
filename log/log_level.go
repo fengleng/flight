@@ -10,6 +10,22 @@ const (
 	FATAL
 )
 
+var levelMap = map[string]Level{
+	"DEBUG": DEBUG,
+	"INFO":  INFO,
+	"WARN":  WARN,
+	"ERROR": ERROR,
+	"FATAL": FATAL,
+}
+
+func GetLogLevel(s string) Level {
+	level, ok := levelMap[s]
+	if ok {
+		return level
+	}
+	return INFO
+}
+
 func (l Level) String() string {
 	levelStr := "INFO"
 	switch l {
