@@ -14,7 +14,8 @@ type Schema struct {
 	NodeMap map[string]*config.NodeConfig
 	RuleMap map[string]*config.RuleConfig
 
-	BackendNode map[string]*backend_node.Node
+	BackendNode        map[string]*backend_node.Node
+	DefaultBackendNode *backend_node.Node
 }
 
 func ParseSchemaList(cfgList []config.SchemaConfig) (map[string]*Schema, error) {
@@ -67,7 +68,11 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 		}
 		schema.RuleMap[ruleCfg.TableName] = &ruleCfg
 	}
-
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
 	schema.DefaultNode = schema.NodeMap[cfg.DefaultNode]
+	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode])
+
 	return &schema, nil
 }

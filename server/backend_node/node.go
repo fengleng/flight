@@ -27,7 +27,7 @@ func ParseNodeList(cfgList []config.NodeConfig) (map[string]*Node, error) {
 			err = errors.Errorf("duplicated node[%s]", nc.Name)
 			return nil, err
 		}
-		if node, err := parseNode(nc); err != nil {
+		if node, err := ParseNode(nc); err != nil {
 			return nil, errors.Trace(err)
 		} else {
 			backNodeMap[nc.Name] = node
@@ -37,7 +37,7 @@ func ParseNodeList(cfgList []config.NodeConfig) (map[string]*Node, error) {
 	return backNodeMap, nil
 }
 
-func parseNode(cfg config.NodeConfig) (*Node, error) {
+func ParseNode(cfg config.NodeConfig) (*Node, error) {
 	var err error
 	n := new(Node)
 	n.Cfg = cfg

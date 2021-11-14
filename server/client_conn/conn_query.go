@@ -29,9 +29,12 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 		return mysql.NewDefaultError(mysql.ER_PARSE_ERROR)
 	}
 	Log.Info("%v", vv)
-	node := c.srv.BackEndNode["biz"]
+	//node := c.srv.BackEndNode["flight"]
 
-	result, err := node.Master.Execute(sql)
+	schema := c.srv.SchemaMap["flight"]
+	result, err := schema.DefaultBackendNode.Master.Execute(sql)
+
+	//result, err := node.de.Execute(sql)
 	if err != nil {
 		Log.Error("server parse %v", errors.Trace(err))
 		return err
