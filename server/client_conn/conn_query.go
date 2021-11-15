@@ -86,3 +86,12 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 
 	return nil
 }
+
+func PreHand(sql string) (r *mysql.Result, c bool, err error) {
+	r, c, err = &mysql.Result{}, false, nil
+	//if strings.Contains(sql,) {
+	//
+	//}
+
+	return
+}
