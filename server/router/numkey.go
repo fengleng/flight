@@ -50,7 +50,7 @@ func ParseNumSharding(Locations []int, TableRowLimit int) ([]NumKeyRange, error)
 	return ranges, nil
 }
 
-//return date of daynumber by order
+// ParseDayRange return date of daynumber by order
 //20151201-20151205
 //20151201,20151202,20151203,20151204,20151205
 func ParseDayRange(dateRange string) ([]int, error) {

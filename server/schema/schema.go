@@ -3,6 +3,7 @@ package schema
 import (
 	"github.com/fengleng/flight/config"
 	"github.com/fengleng/flight/server/backend_node"
+	"github.com/fengleng/flight/server/router"
 	"github.com/juju/errors"
 )
 
@@ -59,6 +60,9 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 		schema.BackendNode = backendMap
 	}
 
+	schema.DefaultNode = schema.NodeMap[cfg.DefaultNode]
+	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode], cfg.SchemaName)
+
 	schema.RuleMap = make(map[string]*config.RuleConfig)
 	for _, ruleCfg := range cfg.RuleList {
 		_, ok := schema.NodeMap[ruleCfg.TableName]
@@ -66,13 +70,23 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 			err = errors.Errorf("duplicated ruleCfg[%s]", ruleCfg.TableName)
 			return nil, err
 		}
+		if ruleCfg.DefaultNode=="" {
+			ruleCfg.DefaultNode=cfg.DefaultNode
+		}
+		if len(ruleCfg.NodeList) == 0{
+			ruleCfg.NodeList = cfg.NodeList
+		}
+
+		router.ParseRule(&ruleCfg)
 		schema.RuleMap[ruleCfg.TableName] = &ruleCfg
 	}
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-	schema.DefaultNode = schema.NodeMap[cfg.DefaultNode]
-	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode], cfg.SchemaName)
+
+	//if err != nil {
+	//	return nil, errors.Trace(err)
+	//}
+
+
+
 
 	return &schema, nil
 }

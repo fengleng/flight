@@ -45,6 +45,8 @@ type RuleConfig struct {
 	ChildTableList []ChildTableConfig `yaml:"child_table_list"`
 	NodeList       []string           `yaml:"node_list"`
 	DefaultNode    string             `yaml:"default_node"`
+	DateRange      []string           `yaml:"date_range"`
+	TableRowLimit  int                `yaml:"table_row_limit"`
 }
 
 type ChildTableConfig struct {
