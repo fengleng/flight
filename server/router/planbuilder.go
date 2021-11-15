@@ -1,7 +1,8 @@
 package router
 
 import (
-	"github.com/fengleng/flight/server/errors"
+	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"sort"
 	"strconv"
 
@@ -275,7 +276,7 @@ func (plan *Plan) calRouteIndexs() error {
 		if plan.Rule.Type != DefaultRuleType {
 			golog.Error("Plan", "calRouteIndexs", "plan have no criteria", 0,
 				"type", plan.Rule.Type)
-			return errors.ErrNoCriteria
+			return my_errors.ErrNoCriteria
 		}
 	}
 
@@ -308,11 +309,11 @@ func (plan *Plan) checkValuesType(vals sqlparser.Values) (sqlparser.Values, erro
 		case sqlparser.ValTuple:
 			result := plan.getValueType(tuple[0])
 			if result != VALUE_NODE {
-				return nil, errors.ErrInsertTooComplex
+				return nil, my_errors.ErrInsertTooComplex
 			}
 		default:
 			//panic(sqlparser.NewParserError("insert is too complex"))
-			return nil, errors.ErrInsertTooComplex
+			return nil, my_errors.ErrInsertTooComplex
 		}
 	}
 	return vals, nil
@@ -435,7 +436,7 @@ func (plan *Plan) getInsertTableIndex(vals sqlparser.Values) ([]int, error) {
 	for i := 0; i < len(vals); i++ {
 		valueExpression := vals[i].(sqlparser.ValTuple)
 		if len(valueExpression) < (plan.KeyIndex + 1) {
-			return nil, errors.ErrColsLenNotMatch
+			return nil, my_errors.ErrColsLenNotMatch
 		}
 
 		tableIndex, err := plan.getTableIndexByValue(valueExpression[plan.KeyIndex])
@@ -458,7 +459,7 @@ func (plan *Plan) getInsertTableIndex(vals sqlparser.Values) ([]int, error) {
 // plan.Rule cols must not nil
 func (plan *Plan) GetIRKeyIndex(cols sqlparser.Columns) error {
 	if plan.Rule == nil {
-		return errors.ErrNoPlanRule
+		return my_errors.ErrNoPlanRule
 	}
 	plan.KeyIndex = -1
 	for i, _ := range cols {
@@ -470,7 +471,7 @@ func (plan *Plan) GetIRKeyIndex(cols sqlparser.Columns) error {
 		}
 	}
 	if plan.KeyIndex == -1 {
-		return errors.ErrIRNoShardingKey
+		return my_errors.ErrIRNoShardingKey
 	}
 	return nil
 }

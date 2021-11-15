@@ -2,18 +2,18 @@ package router
 
 import (
 	"fmt"
+	"github.com/fengleng/flight/config"
+	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"strings"
 
-	"github.com/flike/kingshard/config"
-	"github.com/flike/kingshard/core/errors"
-	"github.com/flike/kingshard/core/golog"
-	"github.com/flike/kingshard/sqlparser"
+	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/server/my_errors"
 )
 
 var (
 	DefaultRuleType   = "default"
 	HashRuleType      = "hash"
-	RangeRuleType     = "range"
+	ModRuleType       = "Mod"
 	DateYearRuleType  = "date_year"
 	DateMonthRuleType = "date_month"
 	DateDayRuleType   = "date_day"
@@ -23,12 +23,13 @@ var (
 )
 
 type Rule struct {
-	DB    string
+	//DB    string
 	Table string
 	Key   string
 
 	Type           string
 	Nodes          []string
+	NodeList       []string
 	SubTableIndexs []int       //SubTableIndexs store all the index of sharding sub-table,sequential
 	TableToNode    map[int]int //key is table index, and value is node index
 	Shard          Shard
@@ -82,7 +83,7 @@ func (r *Rule) checkUpdateExprs(exprs sqlparser.UpdateExprs) error {
 
 	for _, e := range exprs {
 		if string(e.Name.Name) == r.Key {
-			return errors.ErrUpdateKey
+			return my_errors.ErrUpdateKey
 		}
 	}
 	return nil
@@ -147,20 +148,20 @@ func (r *Router) GetRule(db, table string) *Rule {
 	}
 }
 
-func parseRule(cfg *config.ShardConfig) (*Rule, error) {
+func parseRule(cfg *config.RuleConfig) (*Rule, error) {
 	r := new(Rule)
-	r.DB = cfg.DB
-	r.Table = cfg.Table
+	//r.DB = cfg.DB
+	r.Table = cfg.TableName
 	r.Key = strings.ToLower(cfg.Key) //ignore case
 	r.Type = cfg.Type
-	r.Nodes = cfg.Nodes //将ruleconfig中的nodes赋值给rule
+	r.NodeList = cfg.NodeList //将ruleconfig中的nodes赋值给rule
 	r.TableToNode = make(map[int]int, 0)
 
 	switch r.Type {
 	case HashRuleType, RangeRuleType:
 		var sumTables int
 		if len(cfg.Locations) != len(r.Nodes) {
-			return nil, errors.ErrLocationsCount
+			return nil, my_errors.ErrLocationsCount
 		}
 		for i := 0; i < len(cfg.Locations); i++ {
 			for j := 0; j < cfg.Locations[i]; j++ {
@@ -171,7 +172,7 @@ func parseRule(cfg *config.ShardConfig) (*Rule, error) {
 		}
 	case DateDayRuleType:
 		if len(cfg.DateRange) != len(r.Nodes) {
-			return nil, errors.ErrDateRangeCount
+			return nil, my_errors.ErrDateRangeCount
 		}
 		for i := 0; i < len(cfg.DateRange); i++ {
 			dayNumbers, err := ParseDayRange(cfg.DateRange[i])
@@ -180,7 +181,7 @@ func parseRule(cfg *config.ShardConfig) (*Rule, error) {
 			}
 			currIndexLen := len(r.SubTableIndexs)
 			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= dayNumbers[0] {
-				return nil, errors.ErrDateIllegal
+				return nil, my_errors.ErrDateIllegal
 			}
 			for _, v := range dayNumbers {
 				r.SubTableIndexs = append(r.SubTableIndexs, v)
@@ -189,7 +190,7 @@ func parseRule(cfg *config.ShardConfig) (*Rule, error) {
 		}
 	case DateMonthRuleType:
 		if len(cfg.DateRange) != len(r.Nodes) {
-			return nil, errors.ErrDateRangeCount
+			return nil, my_errors.ErrDateRangeCount
 		}
 		for i := 0; i < len(cfg.DateRange); i++ {
 			monthNumbers, err := ParseMonthRange(cfg.DateRange[i])
@@ -198,7 +199,7 @@ func parseRule(cfg *config.ShardConfig) (*Rule, error) {
 			}
 			currIndexLen := len(r.SubTableIndexs)
 			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= monthNumbers[0] {
-				return nil, errors.ErrDateIllegal
+				return nil, my_errors.ErrDateIllegal
 			}
 			for _, v := range monthNumbers {
 				r.SubTableIndexs = append(r.SubTableIndexs, v)
@@ -207,7 +208,7 @@ func parseRule(cfg *config.ShardConfig) (*Rule, error) {
 		}
 	case DateYearRuleType:
 		if len(cfg.DateRange) != len(r.Nodes) {
-			return nil, errors.ErrDateRangeCount
+			return nil, my_errors.ErrDateRangeCount
 		}
 		for i := 0; i < len(cfg.DateRange); i++ {
 			yearNumbers, err := ParseYearRange(cfg.DateRange[i])
@@ -216,7 +217,7 @@ func parseRule(cfg *config.ShardConfig) (*Rule, error) {
 			}
 			currIndexLen := len(r.SubTableIndexs)
 			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= yearNumbers[0] {
-				return nil, errors.ErrDateIllegal
+				return nil, my_errors.ErrDateIllegal
 			}
 			for _, v := range yearNumbers {
 				r.TableToNode[v] = i
@@ -286,7 +287,7 @@ func (r *Router) BuildPlan(db string, statement sqlparser.Statement) (*Plan, err
 	case *sqlparser.Truncate:
 		return r.buildTruncatePlan(db, stmt)
 	}
-	return nil, errors.ErrNoPlan
+	return nil, my_errors.ErrNoPlan
 }
 
 func (r *Router) buildSelectPlan(db string, statement sqlparser.Statement) (*Plan, error) {
@@ -316,7 +317,7 @@ func (r *Router) buildSelectPlan(db string, statement sqlparser.Statement) (*Pla
 		plan.Criteria = where.Expr //路由条件
 		err = plan.calRouteIndexs()
 		if err != nil {
-			golog.Error("Route", "BuildSelectPlan", err.Error(), 0)
+			Log.Error("Route", "BuildSelectPlan", err.Error(), 0)
 			return nil, err
 		}
 	} else {
@@ -326,8 +327,8 @@ func (r *Router) buildSelectPlan(db string, statement sqlparser.Statement) (*Pla
 	}
 
 	if plan.Rule.Type != DefaultRuleType && len(plan.RouteTableIndexs) == 0 {
-		golog.Error("Route", "BuildSelectPlan", errors.ErrNoCriteria.Error(), 0)
-		return nil, errors.ErrNoCriteria
+		Log.Error("Route", "BuildSelectPlan", my_errors.ErrNoCriteria.Error(), 0)
+		return nil, my_errors.ErrNoCriteria
 	}
 	//generate sql,如果routeTableindexs为空则表示不分表，不分表则发default node
 	err = r.generateSelectSql(plan, stmt)
@@ -342,11 +343,11 @@ func (r *Router) buildInsertPlan(db string, statement sqlparser.Statement) (*Pla
 	plan.Rows = make(map[int]sqlparser.Values)
 	stmt := statement.(*sqlparser.Insert)
 	if _, ok := stmt.Rows.(sqlparser.SelectStatement); ok {
-		return nil, errors.ErrSelectInInsert
+		return nil, my_errors.ErrSelectInInsert
 	}
 
 	if stmt.Columns == nil {
-		return nil, errors.ErrIRNoColumns
+		return nil, my_errors.ErrIRNoColumns
 	}
 
 	//根据sql语句的表，获得对应的分片规则
@@ -366,13 +367,13 @@ func (r *Router) buildInsertPlan(db string, statement sqlparser.Statement) (*Pla
 
 	plan.Criteria, err = plan.checkValuesType(stmt.Rows.(sqlparser.Values))
 	if err != nil {
-		golog.Error("router", "buildInsertPlan", err.Error(), 0, "sql", sqlparser.String(statement))
+		Log.Error("router", "buildInsertPlan", err.Error(), 0, "sql", sqlparser.String(statement))
 		return nil, err
 	}
 
 	err = plan.calRouteIndexs()
 	if err != nil {
-		golog.Error("Route", "BuildInsertPlan", err.Error(), 0)
+		Log.Error("Route", "BuildInsertPlan", err.Error(), 0)
 		return nil, err
 	}
 
@@ -399,7 +400,7 @@ func (r *Router) buildUpdatePlan(db string, statement sqlparser.Statement) (*Pla
 		plan.Criteria = where.Expr //路由条件
 		err = plan.calRouteIndexs()
 		if err != nil {
-			golog.Error("Route", "BuildUpdatePlan", err.Error(), 0)
+			Log.Error("Route", "BuildUpdatePlan", err.Error(), 0)
 			return nil, err
 		}
 	} else {
@@ -409,8 +410,8 @@ func (r *Router) buildUpdatePlan(db string, statement sqlparser.Statement) (*Pla
 	}
 
 	if plan.Rule.Type != DefaultRuleType && len(plan.RouteTableIndexs) == 0 {
-		golog.Error("Route", "BuildUpdatePlan", errors.ErrNoCriteria.Error(), 0)
-		return nil, errors.ErrNoCriteria
+		Log.Error("Route", "BuildUpdatePlan", my_errors.ErrNoCriteria.Error(), 0)
+		return nil, my_errors.ErrNoCriteria
 	}
 	//generate sql,如果routeTableindexs为空则表示不分表，不分表则发default node
 	err = r.generateUpdateSql(plan, stmt)
@@ -433,7 +434,7 @@ func (r *Router) buildDeletePlan(db string, statement sqlparser.Statement) (*Pla
 		plan.Criteria = where.Expr //路由条件
 		err = plan.calRouteIndexs()
 		if err != nil {
-			golog.Error("Route", "BuildUpdatePlan", err.Error(), 0)
+			Log.Error("Route", "BuildUpdatePlan", err.Error(), 0)
 			return nil, err
 		}
 	} else {
@@ -443,8 +444,8 @@ func (r *Router) buildDeletePlan(db string, statement sqlparser.Statement) (*Pla
 	}
 
 	if plan.Rule.Type != DefaultRuleType && len(plan.RouteTableIndexs) == 0 {
-		golog.Error("Route", "BuildDeletePlan", errors.ErrNoCriteria.Error(), 0)
-		return nil, errors.ErrNoCriteria
+		Log.Error("Route", "BuildDeletePlan", my_errors.ErrNoCriteria.Error(), 0)
+		return nil, my_errors.ErrNoCriteria
 	}
 	//generate sql,如果routeTableindexs为空则表示不分表，不分表则发default node
 	err = r.generateDeleteSql(plan, stmt)
@@ -465,8 +466,8 @@ func (r *Router) buildTruncatePlan(db string, statement sqlparser.Statement) (*P
 	plan.RouteNodeIndexs = makeList(0, len(plan.Rule.Nodes))
 
 	if plan.Rule.Type != DefaultRuleType && len(plan.RouteTableIndexs) == 0 {
-		golog.Error("Route", "buildTruncatePlan", errors.ErrNoCriteria.Error(), 0)
-		return nil, errors.ErrNoCriteria
+		Log.Error("Route", "buildTruncatePlan", my_errors.ErrNoCriteria.Error(), 0)
+		return nil, my_errors.ErrNoCriteria
 	}
 	//generate sql,如果routeTableindexs为空则表示不分表，不分表则发default node
 	err = r.generateTruncateSql(plan, stmt)
@@ -486,7 +487,7 @@ func (r *Router) buildReplacePlan(db string, statement sqlparser.Statement) (*Pl
 	}
 
 	if stmt.Columns == nil {
-		return nil, errors.ErrIRNoColumns
+		return nil, my_errors.ErrIRNoColumns
 	}
 
 	plan.Rule = r.GetRule(db, sqlparser.String(stmt.Table))
@@ -498,13 +499,13 @@ func (r *Router) buildReplacePlan(db string, statement sqlparser.Statement) (*Pl
 
 	plan.Criteria, err = plan.checkValuesType(stmt.Rows.(sqlparser.Values))
 	if err != nil {
-		golog.Error("router", "buildReplacePlan", err.Error(), 0, "sql", sqlparser.String(statement))
+		Log.Error("router", "buildReplacePlan", err.Error(), 0, "sql", sqlparser.String(statement))
 		return nil, err
 	}
 
 	err = plan.calRouteIndexs()
 	if err != nil {
-		golog.Error("Route", "BuildReplacePlan", err.Error(), 0)
+		Log.Error("Route", "BuildReplacePlan", err.Error(), 0)
 		return nil, err
 	}
 
@@ -649,10 +650,10 @@ func (r *Router) generateSelectSql(plan *Plan, stmt sqlparser.Statement) error {
 	sqls := make(map[string][]string)
 	node, ok := stmt.(*sqlparser.Select)
 	if ok == false {
-		return errors.ErrStmtConvert
+		return my_errors.ErrStmtConvert
 	}
 	if len(plan.RouteNodeIndexs) == 0 {
-		return errors.ErrNoRouteNode
+		return my_errors.ErrNoRouteNode
 	}
 	if len(plan.RouteTableIndexs) == 0 {
 		buf := sqlparser.NewTrackedBuffer(nil)
@@ -680,10 +681,10 @@ func (r *Router) generateInsertSql(plan *Plan, stmt sqlparser.Statement) error {
 	sqls := make(map[string][]string)
 	node, ok := stmt.(*sqlparser.Insert)
 	if ok == false {
-		return errors.ErrStmtConvert
+		return my_errors.ErrStmtConvert
 	}
 	if len(plan.RouteNodeIndexs) == 0 {
-		return errors.ErrNoRouteNode
+		return my_errors.ErrNoRouteNode
 	}
 	if len(plan.RouteTableIndexs) == 0 {
 		buf := sqlparser.NewTrackedBuffer(nil)
@@ -720,10 +721,10 @@ func (r *Router) generateUpdateSql(plan *Plan, stmt sqlparser.Statement) error {
 	sqls := make(map[string][]string)
 	node, ok := stmt.(*sqlparser.Update)
 	if ok == false {
-		return errors.ErrStmtConvert
+		return my_errors.ErrStmtConvert
 	}
 	if len(plan.RouteNodeIndexs) == 0 {
-		return errors.ErrNoRouteNode
+		return my_errors.ErrNoRouteNode
 	}
 	if len(plan.RouteTableIndexs) == 0 {
 		buf := sqlparser.NewTrackedBuffer(nil)
@@ -763,10 +764,10 @@ func (r *Router) generateDeleteSql(plan *Plan, stmt sqlparser.Statement) error {
 	sqls := make(map[string][]string)
 	node, ok := stmt.(*sqlparser.Delete)
 	if ok == false {
-		return errors.ErrStmtConvert
+		return my_errors.ErrStmtConvert
 	}
 	if len(plan.RouteNodeIndexs) == 0 {
-		return errors.ErrNoRouteNode
+		return my_errors.ErrNoRouteNode
 	}
 	if len(plan.RouteTableIndexs) == 0 {
 		buf := sqlparser.NewTrackedBuffer(nil)
@@ -805,10 +806,10 @@ func (r *Router) generateReplaceSql(plan *Plan, stmt sqlparser.Statement) error 
 	sqls := make(map[string][]string)
 	node, ok := stmt.(*sqlparser.Replace)
 	if ok == false {
-		return errors.ErrStmtConvert
+		return my_errors.ErrStmtConvert
 	}
 	if len(plan.RouteNodeIndexs) == 0 {
-		return errors.ErrNoRouteNode
+		return my_errors.ErrNoRouteNode
 	}
 	if len(plan.RouteTableIndexs) == 0 {
 		buf := sqlparser.NewTrackedBuffer(nil)
@@ -848,10 +849,10 @@ func (r *Router) generateTruncateSql(plan *Plan, stmt sqlparser.Statement) error
 	sqls := make(map[string][]string)
 	node, ok := stmt.(*sqlparser.Truncate)
 	if ok == false {
-		return errors.ErrStmtConvert
+		return my_errors.ErrStmtConvert
 	}
 	if len(plan.RouteNodeIndexs) == 0 {
-		return errors.ErrNoRouteNode
+		return my_errors.ErrNoRouteNode
 	}
 	if len(plan.RouteTableIndexs) == 0 {
 		buf := sqlparser.NewTrackedBuffer(nil)

@@ -41,8 +41,10 @@ type RuleConfig struct {
 	TableName      string             `yaml:"table_name"`
 	Key            string             `yaml:"key"`
 	Type           string             `yaml:"type"`
-	Location       []int              `yaml:"location"`
+	Locations      []int              `yaml:"location"`
 	ChildTableList []ChildTableConfig `yaml:"child_table_list"`
+	NodeList       []string           `yaml:"node_list"`
+	DefaultNode    string             `yaml:"default_node"`
 }
 
 type ChildTableConfig struct {

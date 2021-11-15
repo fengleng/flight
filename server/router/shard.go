@@ -8,12 +8,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/go-common/core/hack"
 	"hash/crc32"
 	"strconv"
 	"time"
 )
 
-/*由分片ID找到分片，可用文件中的函数*/
+// KeyError /*由分片ID找到分片，可用文件中的函数*/
 type KeyError string
 
 func NewKeyError(format string, args ...interface{}) KeyError {
@@ -103,7 +105,7 @@ type Shard interface {
 	FindForKey(key interface{}) (int, error)
 }
 
-/*一个范围的分片,例如[start,end)*/
+// RangeShard /*一个范围的分片,例如[start,end)*/
 type RangeShard interface {
 	Shard
 	EqualStart(key interface{}, index int) bool
@@ -131,7 +133,7 @@ func (s *NumRangeShard) FindForKey(key interface{}) (int, error) {
 			return i, nil
 		}
 	}
-	return -1, errors.ErrKeyOutOfRange
+	return -1, my_errors.ErrKeyOutOfRange
 }
 
 func (s *NumRangeShard) EqualStart(key interface{}, index int) bool {
@@ -146,7 +148,7 @@ func (s *NumRangeShard) EqualStop(key interface{}, index int) bool {
 type DateYearShard struct {
 }
 
-//the format of date is: YYYY-MM-DD HH:MM:SS,YYYY-MM-DD or unix timestamp(int)
+// FindForKey the format of date is: YYYY-MM-DD HH:MM:SS,YYYY-MM-DD or unix timestamp(int)
 func (s *DateYearShard) FindForKey(key interface{}) (int, error) {
 	switch val := key.(type) {
 	case int:
@@ -171,7 +173,7 @@ func (s *DateYearShard) FindForKey(key interface{}) (int, error) {
 type DateMonthShard struct {
 }
 
-//the format of date is: YYYY-MM-DD HH:MM:SS,YYYY-MM-DD or unix timestamp(int)
+// FindForKey the format of date is: YYYY-MM-DD HH:MM:SS,YYYY-MM-DD or unix timestamp(int)
 func (s *DateMonthShard) FindForKey(key interface{}) (int, error) {
 	timeFormat := "2006-01-02"
 	switch val := key.(type) {
@@ -219,7 +221,7 @@ func (s *DateMonthShard) FindForKey(key interface{}) (int, error) {
 type DateDayShard struct {
 }
 
-//the format of date is: YYYY-MM-DD HH:MM:SS,YYYY-MM-DD or unix timestamp(int)
+// FindForKey the format of date is: YYYY-MM-DD HH:MM:SS,YYYY-MM-DD or unix timestamp(int)
 func (s *DateDayShard) FindForKey(key interface{}) (int, error) {
 	timeFormat := "2006-01-02"
 	switch val := key.(type) {
