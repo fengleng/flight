@@ -1,6 +1,7 @@
 package backend_node
 
 import (
+	"fmt"
 	"github.com/fengleng/flight/config"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/go-mysql-client/backend"
@@ -10,15 +11,15 @@ import (
 
 type Node struct {
 	Master           *backend.DB
-	Slave            []*backend.DB
+	SlaveList        []*backend.DB
 	DownAfterNoAlive time.Duration
 
-	Cfg config.NodeConfig
-
+	Cfg    config.NodeConfig
+	DbName string
 	Online bool
 }
 
-func ParseNodeList(cfgList []config.NodeConfig) (map[string]*Node, error) {
+func ParseNodeList(cfgList []config.NodeConfig, schemaName string) (map[string]*Node, error) {
 	var err error
 	var backNodeMap = make(map[string]*Node)
 	for _, nc := range cfgList {
@@ -27,7 +28,7 @@ func ParseNodeList(cfgList []config.NodeConfig) (map[string]*Node, error) {
 			err = errors.Errorf("duplicated node[%s]", nc.Name)
 			return nil, err
 		}
-		if node, err := ParseNode(nc); err != nil {
+		if node, err := ParseNode(nc, schemaName); err != nil {
 			return nil, errors.Trace(err)
 		} else {
 			backNodeMap[nc.Name] = node
@@ -37,10 +38,11 @@ func ParseNodeList(cfgList []config.NodeConfig) (map[string]*Node, error) {
 	return backNodeMap, nil
 }
 
-func ParseNode(cfg config.NodeConfig) (*Node, error) {
+func ParseNode(cfg config.NodeConfig, schemaName string) (*Node, error) {
 	var err error
 	n := new(Node)
 	n.Cfg = cfg
+	n.DbName = schemaName
 
 	n.DownAfterNoAlive = time.Duration(cfg.DownAfterNoAlive) * time.Second
 
@@ -63,7 +65,7 @@ func (n *Node) ParseMaster(masterStr string) error {
 	if len(masterStr) == 0 {
 		return my_errors.ErrNoMasterConn
 	}
-	master, err := backend.Open(masterStr, n.Cfg.User, n.Cfg.Password, "")
+	master, err := backend.Open(masterStr, n.Cfg.User, n.Cfg.Password, n.DbName)
 	n.Master = master
 
 	return err
@@ -71,36 +73,35 @@ func (n *Node) ParseMaster(masterStr string) error {
 
 // ParseSlave slaveStr(127.0.0.1:3306@2,192.168.0.12:3306@3)
 func (n *Node) ParseSlave(slaveList []string) error {
-	//var db *DB
-	//var weight int
-	//var err error
-	//
-	//if len(slaveStr) == 0 {
-	//	return nil
-	//}
-	//slaveStr = strings.Trim(slaveStr, SlaveSplit)
-	//slaveArray := strings.Split(slaveStr, SlaveSplit)
-	//count := len(slaveArray)
-	//n.Slave = make([]*DB, 0, count)
-	//n.SlaveWeights = make([]int, 0, count)
-	//
-	////parse addr and weight
-	//for i := 0; i < count; i++ {
-	//	addrAndWeight := strings.Split(slaveArray[i], WeightSplit)
-	//	if len(addrAndWeight) == 2 {
-	//		weight, err = strconv.Atoi(addrAndWeight[1])
-	//		if err != nil {
-	//			return err
-	//		}
-	//	} else {
-	//		weight = 1
-	//	}
-	//	n.SlaveWeights = append(n.SlaveWeights, weight)
-	//	if db, err = n.OpenDB(addrAndWeight[0]); err != nil {
-	//		return err
-	//	}
-	//	n.Slave = append(n.Slave, db)
-	//}
-	//n.InitBalancer()
+	for _, slaveStr := range slaveList {
+		slave, err := backend.Open(slaveStr, n.Cfg.User, n.Cfg.Password, n.DbName)
+		if err != nil {
+			return errors.Trace(err)
+		}
+		n.SlaveList = append(n.SlaveList, slave)
+	}
+
+	return nil
+}
+
+func (n *Node) UseDb(dbName string) error {
+	var command = fmt.Sprintf("use %s", dbName)
+
+	if !n.Online {
+		return errors.Errorf("node[%s] have been done", n.Cfg.Name)
+	}
+	_, err := n.Master.Execute(command)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	for _, slave := range n.SlaveList {
+		_, err := slave.Execute(command)
+		if err != nil {
+			return errors.Trace(err)
+		}
+	}
+	n.DbName = dbName
+
 	return nil
 }

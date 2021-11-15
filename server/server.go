@@ -53,6 +53,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	return s, nil
 }
 
+func (s *Server) parseNodeList(cfgList []config.NodeConfig) {
+
+}
+
 func (s *Server) parseSchemaList(cfgList []config.SchemaConfig) error {
 
 	if schemaMap, err := schema.ParseSchemaList(cfgList); err != nil {

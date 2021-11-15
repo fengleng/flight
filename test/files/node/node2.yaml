@@ -1,0 +1,7 @@
+name: node2
+max_conns_limit: 32
+user: root
+password: root
+master: 127.0.0.1:3306
+slave_list: [127.0.0.1:3306,127.0.0.1:3306]
+down_after_noalive: 32

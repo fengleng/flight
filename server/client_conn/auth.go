@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"github.com/fengleng/flight/common"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/fengleng/log"
 	"github.com/pingcap/errors"
@@ -44,7 +45,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, 10)
 
 	//server version[00]
-	data = append(data, mysql.ServerVersion...)
+	data = append(data, common.ServerVersion...)
 	data = append(data, 0)
 
 	//connection id

@@ -777,3 +777,8 @@ func (c *ClientConn) loadResultWithFuncIntoMap(rs []*mysql.Result,
 
 	return resultMap, nil
 }
+
+func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) error {
+
+	return nil
+}

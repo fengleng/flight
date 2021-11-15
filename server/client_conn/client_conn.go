@@ -4,6 +4,7 @@ import (
 	"fmt"
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server"
+	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/go-common/core/hack"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
@@ -15,7 +16,8 @@ type ClientConn struct {
 	c   net.Conn
 	pkg *mysql.PacketIO
 
-	srv *server.Server
+	srv    *server.Server
+	schema *schema.Schema
 
 	connectionId uint32
 	status       uint16
@@ -70,6 +72,7 @@ func NewClientConn(co net.Conn, s *server.Server) *ClientConn {
 	//c.stmtId = 0
 	//c.stmts = make(map[uint32]*Stmt)
 	c.srv = s
+
 	return c
 }
 
@@ -175,6 +178,10 @@ func (c *ClientConn) Run() {
 		return
 	}
 
+	if len(c.db) > 0 {
+		c.schema = c.srv.SchemaMap[c.db]
+	}
+
 	for {
 		if data, err := c.readPacket(); err != nil {
 			Log.Error("%v", errors.AddStack(err))
@@ -211,8 +218,8 @@ func (c *ClientConn) dispatch(data []byte) error {
 		return c.handleQuery(hack.String(data))
 	case mysql.COM_PING:
 		return c.writeOK(nil)
-	//case mysql.COM_INIT_DB:
-	//	return c.handleUseDB(hack.String(data))
+	case mysql.COM_INIT_DB:
+		return c.handleUseDB(hack.String(data))
 	//case mysql.COM_FIELD_LIST:
 	//	return c.handleFieldList(data)
 	//case mysql.COM_STMT_PREPARE:

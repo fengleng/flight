@@ -44,7 +44,7 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 	schema.Name = cfg.SchemaName
 
 	schema.NodeMap = make(map[string]*config.NodeConfig)
-	for _, nodeCfg := range cfg.NodeList {
+	for _, nodeCfg := range cfg.NodeCfgList {
 		_, ok := schema.NodeMap[nodeCfg.Name]
 		if ok {
 			err = errors.Errorf("duplicated node[%s]", nodeCfg.Name)
@@ -53,7 +53,7 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 		schema.NodeMap[nodeCfg.Name] = &nodeCfg
 	}
 
-	if backendMap, err := backend_node.ParseNodeList(cfg.NodeList); err != nil {
+	if backendMap, err := backend_node.ParseNodeList(cfg.NodeCfgList, schema.Name); err != nil {
 		return nil, errors.Trace(err)
 	} else {
 		schema.BackendNode = backendMap
@@ -72,7 +72,7 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 		return nil, errors.Trace(err)
 	}
 	schema.DefaultNode = schema.NodeMap[cfg.DefaultNode]
-	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode])
+	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode], cfg.SchemaName)
 
 	return &schema, nil
 }

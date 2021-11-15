@@ -3,8 +3,10 @@ package config
 import (
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/go-mysql-client/mysql"
+	"github.com/juju/errors"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"strings"
 )
 
 type Config struct {
@@ -15,15 +17,20 @@ type Config struct {
 	CollationId       mysql.CollationId `yaml:"collation_id"`
 	DefaultAuthMethod string            `yaml:"default_auth_method"`
 
-	SchemaPath []string     `yaml:"schema_path"`
-	LogPath    string       `yaml:"log_path"`
-	UserList   []UserConfig `yaml:"user_list"`
+	LogPath  string       `yaml:"log_path"`
+	UserList []UserConfig `yaml:"user_list"`
+
+	NodePath   []string `yaml:"node_path"`
+	NodeList   []NodeConfig
+	SchemaPath []string `yaml:"schema_path"`
 	SchemaList []SchemaConfig
 }
 
 type SchemaConfig struct {
-	NodeList   []NodeConfig `yaml:"node_list"`
-	SchemaName string       `yaml:"schema_name"`
+	NodeList   []string `yaml:"node_list"`
+	SchemaName string   `yaml:"schema_name"`
+
+	NodeCfgList []NodeConfig
 
 	DefaultNode string `yaml:"default_node"`
 
@@ -74,6 +81,27 @@ func ParseConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
+	for _, p := range cfg.NodePath {
+		data2, err := ioutil.ReadFile(p)
+		if err != nil {
+			StdLog.Fatal("parse config err :%v", err)
+			return nil, err
+		}
+		var nc NodeConfig
+		err = yaml.Unmarshal(data2, &nc)
+		if err != nil {
+			StdLog.Fatal("parse config err :%v", err)
+			return nil, err
+		}
+		nc.Name = strings.Trim(nc.Name, " ")
+		if isContainsNode(nc.Name, cfg.NodeList) {
+			err := errors.Errorf("node[%s] duplicated", nc.Name)
+			StdLog.Fatal("%v", err)
+			return nil, err
+		}
+		cfg.NodeList = append(cfg.NodeList, nc)
+	}
+
 	for _, p := range cfg.SchemaPath {
 		data2, err := ioutil.ReadFile(p)
 		if err != nil {
@@ -86,8 +114,48 @@ func ParseConfig(path string) (*Config, error) {
 			StdLog.Fatal("parse config err :%v", err)
 			return nil, err
 		}
+		var nodeCfgList []NodeConfig
+		for _, nodeName := range sc.NodeList {
+
+			if isContainsNode(nodeName, nodeCfgList) {
+				err := errors.Errorf("schema[%s] node[%s] duplicated", sc.SchemaName, nodeName)
+				StdLog.Fatal("%v", err)
+				return nil, err
+			}
+
+			if nodeCfg, ok := findGlobalNodeCfg(nodeName, cfg.NodeList); !ok {
+				err := errors.Errorf("schema[%s] node[%s] not exist", sc.SchemaName, nodeName)
+				StdLog.Fatal("%v", err)
+				return nil, err
+			} else {
+				sc.NodeCfgList = append(sc.NodeCfgList, nodeCfg)
+			}
+		}
 		cfg.SchemaList = append(cfg.SchemaList, sc)
 	}
 
 	return &cfg, nil
+}
+
+func isContainsNode(nodeName string, nodeCfgList []NodeConfig) bool {
+	nodeName = strings.Trim(nodeName, " ")
+	for _, config := range nodeCfgList {
+		if nodeName == config.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func findGlobalNodeCfg(nodeName string, nodeCfgList []NodeConfig) (NodeConfig, bool) {
+	nodeName = strings.Trim(nodeName, " ")
+	cfg, isFind := NodeConfig{}, false
+	for _, config := range nodeCfgList {
+		if nodeName == config.Name {
+			isFind = true
+			cfg = config
+			break
+		}
+	}
+	return cfg, isFind
 }
