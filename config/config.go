@@ -50,8 +50,9 @@ type RuleConfig struct {
 }
 
 type ChildTableConfig struct {
-	AssociatedKey string `yaml:"associated_key"`
-	TableName     string `yaml:"table_name"`
+	ReferenceCol string `yaml:"reference_col"` //主表列
+	TableName    string `yaml:"table_name"`
+	fk           string `yaml:"fk"`
 }
 
 type UserConfig struct {

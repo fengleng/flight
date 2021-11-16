@@ -15,5 +15,6 @@ rule_list:
     type: mod
     location: [1,1]
     child_table_list:
-      - associated_key: ff1
+      - reference_col: ff1
         table_name: flight_table2
+        fk: f1
