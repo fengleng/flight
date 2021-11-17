@@ -39,15 +39,15 @@ type SchemaConfig struct {
 }
 
 type TableConfig struct {
-	TableName       string                `yaml:"table_name"`
-	Key             string                `yaml:"key"`
-	Type            string                `yaml:"type"`
-	Locations       []int                 `yaml:"locations"`
-	AssociatedTable AssociatedTableConfig `yaml:"associated_table"`
-	NodeList        []string              `yaml:"node_list"`
-	DefaultNode     string                `yaml:"default_node"`
-	DateRange       []string              `yaml:"date_range"`
-	TableRowLimit   int                   `yaml:"table_row_limit"`
+	TableName       string                 `yaml:"table_name"`
+	Key             string                 `yaml:"key"`
+	Type            string                 `yaml:"type"`
+	Locations       []int                  `yaml:"locations"`
+	AssociatedTable *AssociatedTableConfig `yaml:"associated_table"`
+	NodeList        []string               `yaml:"node_list"`
+	DefaultNode     string                 `yaml:"default_node"`
+	DateRange       []string               `yaml:"date_range"`
+	TableRowLimit   int                    `yaml:"table_row_limit"`
 }
 
 type AssociatedTableConfig struct {

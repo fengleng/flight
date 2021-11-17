@@ -5,7 +5,6 @@ import (
 	"github.com/fengleng/flight/config"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/juju/errors"
-	"strings"
 )
 
 //
@@ -31,28 +30,30 @@ var (
 	MonthsCount       = 12
 )
 
-//
 type Rule struct {
-	//DB    string
-	Table              string
-	Key                string
-	cfg                config.TableConfig
-	AssociatedTableMap map[string]config.AssociatedTableConfig
+	cfg config.TableConfig
+
+	Table string
+
+	Key string
 
 	Type string
-	//Nodes          []string
-	DefaultNode    string
-	NodeList       []string
+
+	AssociatedTable *config.AssociatedTableConfig
+	IsAssociated    bool
+	AssociatedKey   string
+
+	DefaultNode string
+	NodeList    []string
+
 	SubTableIndexs []int       //SubTableIndexs store all the index of sharding sub-table,sequential
 	TableToNode    map[int]int //key is table index, and value is node index
-	Shard          Shard
+
+	Shard Shard
 }
 
 type Router struct {
-	//map[table_name]*Rule
 	Rules map[string]*Rule
-	//DefaultRule *Rule
-	//Nodes       []string //just for human saw
 }
 
 func NewDefaultRule(node string) *Rule {
@@ -65,110 +66,35 @@ func NewDefaultRule(node string) *Rule {
 	return r
 }
 
-func (r *Rule) FindNode(key interface{}) (string, error) {
-	tableIndex, err := r.Shard.FindForKey(key)
+func (r *Rule) FindNode() (string, error) {
+	nodeIndex, err := r.FindNodeIndex()
 	if err != nil {
 		return "", err
 	}
-	nodeIndex := r.TableToNode[tableIndex]
 	return r.NodeList[nodeIndex], nil
 }
 
-////
-////func (r *Rule) FindNodeIndex(key interface{}) (int, error) {
-////	tableIndex, err := r.Shard.FindForKey(key)
-////	if err != nil {
-////		return -1, err
-////	}
-////	return r.TableToNode[tableIndex], nil
-////}
-////
-////func (r *Rule) FindTableIndex(key interface{}) (int, error) {
-////	return r.Shard.FindForKey(key)
-////}
-////
-//////UpdateExprs is the expression after set
-////func (r *Rule) checkUpdateExprs(exprs sqlparser.UpdateExprs) error {
-////	if r.Type == DefaultRuleType {
-////		return nil
-////	} else if len(r.Nodes) == 1 {
-////		return nil
-////	}
-////
-////	for _, e := range exprs {
-////		if string(e.Name.Name) == r.Key {
-////			return my_errors.ErrUpdateKey
-////		}
-////	}
-////	return nil
-////}
-//
-////NewRouter build router according to the config file
-////func NewRouter(schemaConfig *config.SchemaConfig) (*Router, error) {
-////	if !includeNode(schemaConfig.Nodes, schemaConfig.Default) {
-////		return nil, fmt.Errorf("default node[%s] not in the nodes list",
-////			schemaConfig.Default)
-////	}
-////
-////	rt := new(Router)
-////	rt.Nodes = schemaConfig.Nodes //对应schema中的nodes
-////	rt.Rules = make(map[string]map[string]*Rule)
-////	rt.DefaultRule = NewDefaultRule(schemaConfig.Default)
-////
-////	for _, shard := range schemaConfig.ShardRule {
-////		for _, node := range shard.Nodes {
-////			if !includeNode(rt.Nodes, node) {
-////				return nil, fmt.Errorf("shard table[%s] node[%s] not in the schema.nodes list:[%s]",
-////					shard.Table, node, strings.Join(shard.Nodes, ","))
-////			}
-////		}
-////		rule, err := parseRule(&shard)
-////		if err != nil {
-////			return nil, err
-////		}
-////
-////		if rule.Type == DefaultRuleType {
-////			return nil, fmt.Errorf("[default-rule] duplicate, must only one")
-////		}
-////		//if the database exist in rules
-////		if _, ok := rt.Rules[rule.DB]; ok {
-////			if _, ok := rt.Rules[rule.DB][rule.Table]; ok {
-////				return nil, fmt.Errorf("table %s rule in %s duplicate", rule.Table, rule.DB)
-////			} else {
-////				rt.Rules[rule.DB][rule.Table] = rule
-////			}
-////		} else {
-////			m := make(map[string]*Rule)
-////			rt.Rules[rule.DB] = m
-////			rt.Rules[rule.DB][rule.Table] = rule
-////		}
-////	}
-////	return rt, nil
-////}
-//
-//func (r *Router) GetRule(db, table string) *Rule {
-//	//arry := strings.Split(table, ".")
-//	//if len(arry) == 2 {
-//	//	table = strings.Trim(arry[1], "`")
-//	//	db = strings.Trim(arry[0], "`")
-//	//}
-//	//rule := r.Rules[db][table]
-//	//if rule == nil {
-//	//	//set the database of default rule
-//	//	//r.DefaultRule.DB = db
-//	//	return r.DefaultRule
-//	//} else {
-//	//	return rule
-//	//}
-//	return nil
-//}
-//
+func (r *Rule) FindNodeIndex() (int, error) {
+	tableIndex, err := r.FindTableIndex()
+	if err != nil {
+		return -1, err
+	}
+	return r.TableToNode[tableIndex], nil
+}
 
-func ParseRouter(cfgList []config.TableConfig, cfg *config.SchemaConfig) (r *Router, err error) {
-	r = new(Router)
-	r.Rules = make(map[string]*Rule)
+func (r *Rule) FindTableIndex() (int, error) {
+	if r.IsAssociated {
+		return r.Shard.FindForKey(r.AssociatedKey)
+	} else {
+		return r.Shard.FindForKey(r.Key)
+	}
+}
+
+func ParseRouter(cfgList []config.TableConfig, cfg *config.SchemaConfig) (router *Router, err error) {
+	router = new(Router)
+	router.Rules = make(map[string]*Rule)
 	for _, tableCfg := range cfgList {
-		_, ok := r.Rules[tableCfg.TableName]
+		_, ok := router.Rules[tableCfg.TableName]
 		if ok {
 			err = errors.Errorf("duplicated tableCfg[%s]", tableCfg.TableName)
 			return nil, err
@@ -180,51 +106,82 @@ func ParseRouter(cfgList []config.TableConfig, cfg *config.SchemaConfig) (r *Rou
 			tableCfg.NodeList = cfg.NodeList
 		}
 
-		rule, err := ParseRule(tableCfg)
+		var isAssociated bool
+		if tableCfg.Type == "" && tableCfg.AssociatedTable != nil {
+			if !containsTable(tableCfg, cfgList) {
+				return nil, errors.Errorf("[%s] associatedTable [%s] is not found")
+			}
+			isAssociated = true
+		}
+		rule, err := ParseRule(tableCfg, isAssociated)
 		if err != nil {
 			return nil, errors.Trace(err)
 		}
-		r.Rules[tableCfg.TableName] = rule
+		router.Rules[tableCfg.TableName] = rule
 	}
 
-	for _, rule := range r.Rules {
-		for tableName, _ := range rule.AssociatedTableMap {
-			if _, ok := r.Rules[tableName]; !ok {
-				err = errors.Errorf("reference table[%s] not exist", tableName)
-				return nil, err
-			}
-		}
-	}
-	return r, err
+	return router, err
 }
 
-func ParseRule(cfg config.TableConfig) (*Rule, error) {
-	if cfg.Type == "" {
-		return NewDefaultRule(cfg.DefaultNode), nil
-	}
+//func parseAssociatedTableRule(cfg config.TableConfig) (*Rule, error) {
+//	r := newRule(cfg,true)
+//
+//	return r,nil
+//}
+
+func newRule(cfg config.TableConfig, isAssociated bool) *Rule {
 	r := new(Rule)
 	r.cfg = cfg
-	r.AssociatedTableMap = make(map[string]config.AssociatedTableConfig)
-	for _, tc := range cfg.AssociatedTableList {
-		_, ok := r.AssociatedTableMap[tc.ReferenceTableName]
-		if ok {
-			err := errors.Errorf("associatedTable [%s] dunplicate", cfg.TableName)
-			return nil, err
-		}
-		r.AssociatedTableMap[tc.ReferenceTableName] = tc
-	}
-	r.Table = cfg.TableName
-	r.Key = strings.ToLower(cfg.Key) //ignore case
-	r.Type = cfg.Type
-	r.NodeList = cfg.NodeList       //将ruleconfig中的nodes赋值给rule
-	r.DefaultNode = cfg.DefaultNode //将ruleconfig中的nodes赋值给rule
-	r.TableToNode = make(map[int]int, 0)
 
+	r.Table = cfg.TableName
+	r.Key = cfg.Key
+	r.Type = cfg.Type
+
+	r.AssociatedTable = cfg.AssociatedTable
+	r.IsAssociated = isAssociated
+	r.AssociatedKey = cfg.AssociatedTable.Fk
+
+	r.DefaultNode = cfg.DefaultNode
+	r.NodeList = cfg.NodeList
+	r.TableToNode = make(map[int]int, 0)
+	return r
+}
+
+func containsTable(table config.TableConfig, cfgList []config.TableConfig) bool {
+	for _, t := range cfgList {
+		if t.TableName == table.AssociatedTable.ReferenceTableName {
+			return true
+		}
+	}
+	return false
+}
+
+func ParseRule(cfg config.TableConfig, isAssociated bool) (*Rule, error) {
+	if cfg.Type != "" && cfg.AssociatedTable != nil {
+		return nil, errors.Errorf("rule [%s] type, associatedTable only change one", cfg.TableName)
+	}
+	if cfg.Type == "" && cfg.AssociatedTable == nil {
+		return NewDefaultRule(cfg.DefaultNode), nil
+	}
+	r := newRule(cfg, isAssociated)
+
+	if err := parseRuleNode(cfg, r); err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	if err := parseShard(r, cfg); err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
+func parseRuleNode(cfg config.TableConfig, r *Rule) error {
 	switch r.Type {
 	case HashRuleType, RangeRuleType:
 		var sumTables int
 		if len(cfg.Locations) != len(r.NodeList) {
-			return nil, my_errors.ErrLocationsCount
+			return my_errors.ErrLocationsCount
 		}
 		for i := 0; i < len(cfg.Locations); i++ {
 			for j := 0; j < cfg.Locations[i]; j++ {
@@ -235,16 +192,16 @@ func ParseRule(cfg config.TableConfig) (*Rule, error) {
 		}
 	case DateDayRuleType:
 		if len(cfg.DateRange) != len(r.NodeList) {
-			return nil, my_errors.ErrDateRangeCount
+			return my_errors.ErrDateRangeCount
 		}
 		for i := 0; i < len(cfg.DateRange); i++ {
 			dayNumbers, err := ParseDayRange(cfg.DateRange[i])
 			if err != nil {
-				return nil, err
+				return err
 			}
 			currIndexLen := len(r.SubTableIndexs)
 			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= dayNumbers[0] {
-				return nil, my_errors.ErrDateIllegal
+				return my_errors.ErrDateIllegal
 			}
 			for _, v := range dayNumbers {
 				r.SubTableIndexs = append(r.SubTableIndexs, v)
@@ -253,16 +210,16 @@ func ParseRule(cfg config.TableConfig) (*Rule, error) {
 		}
 	case DateMonthRuleType:
 		if len(cfg.DateRange) != len(r.NodeList) {
-			return nil, my_errors.ErrDateRangeCount
+			return my_errors.ErrDateRangeCount
 		}
 		for i := 0; i < len(cfg.DateRange); i++ {
 			monthNumbers, err := ParseMonthRange(cfg.DateRange[i])
 			if err != nil {
-				return nil, err
+				return err
 			}
 			currIndexLen := len(r.SubTableIndexs)
 			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= monthNumbers[0] {
-				return nil, my_errors.ErrDateIllegal
+				return my_errors.ErrDateIllegal
 			}
 			for _, v := range monthNumbers {
 				r.SubTableIndexs = append(r.SubTableIndexs, v)
@@ -271,16 +228,16 @@ func ParseRule(cfg config.TableConfig) (*Rule, error) {
 		}
 	case DateYearRuleType:
 		if len(cfg.DateRange) != len(r.NodeList) {
-			return nil, my_errors.ErrDateRangeCount
+			return my_errors.ErrDateRangeCount
 		}
 		for i := 0; i < len(cfg.DateRange); i++ {
 			yearNumbers, err := ParseYearRange(cfg.DateRange[i])
 			if err != nil {
-				return nil, err
+				return err
 			}
 			currIndexLen := len(r.SubTableIndexs)
 			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= yearNumbers[0] {
-				return nil, my_errors.ErrDateIllegal
+				return my_errors.ErrDateIllegal
 			}
 			for _, v := range yearNumbers {
 				r.TableToNode[v] = i
@@ -288,12 +245,7 @@ func ParseRule(cfg config.TableConfig) (*Rule, error) {
 			}
 		}
 	}
-
-	if err := parseShard(r, cfg); err != nil {
-		return nil, err
-	}
-
-	return r, nil
+	return nil
 }
 
 func parseShard(r *Rule, cfg config.TableConfig) error {
