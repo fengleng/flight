@@ -9,7 +9,7 @@ import (
 )
 
 //flight
-var configFile = flag.String("config", "etc/flight.yaml", "kingshard config file")
+var configFile = flag.String("config", "../etc/flight.yaml", "kingshard config file")
 
 func main() {
 	defer func() {

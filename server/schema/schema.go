@@ -71,7 +71,7 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 		schema.DefaultNode = n
 	}
 	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode], cfg.SchemaName)
-	if r, err := router.ParseRouter(cfg.TableList); err != nil {
+	if r, err := router.ParseRouter(cfg.TableList, cfg); err != nil {
 		return nil, errors.Trace(err)
 	} else {
 		schema.Router = r

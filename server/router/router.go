@@ -164,7 +164,7 @@ func (r *Rule) FindNode(key interface{}) (string, error) {
 //}
 //
 
-func ParseRouter(cfgList []config.TableConfig) (r *Router, err error) {
+func ParseRouter(cfgList []config.TableConfig, cfg *config.SchemaConfig) (r *Router, err error) {
 	r = new(Router)
 	r.Rules = make(map[string]*Rule)
 	for _, tableCfg := range cfgList {
@@ -173,6 +173,13 @@ func ParseRouter(cfgList []config.TableConfig) (r *Router, err error) {
 			err = errors.Errorf("duplicated tableCfg[%s]", tableCfg.TableName)
 			return nil, err
 		}
+		if tableCfg.DefaultNode == "" {
+			tableCfg.DefaultNode = cfg.DefaultNode
+		}
+		if len(tableCfg.NodeList) == 0 {
+			tableCfg.NodeList = cfg.NodeList
+		}
+
 		rule, err := ParseRule(tableCfg)
 		if err != nil {
 			return nil, errors.Trace(err)
@@ -192,8 +199,10 @@ func ParseRouter(cfgList []config.TableConfig) (r *Router, err error) {
 }
 
 func ParseRule(cfg config.TableConfig) (*Rule, error) {
+	if cfg.Type == "" {
+		return NewDefaultRule(cfg.DefaultNode), nil
+	}
 	r := new(Rule)
-	//r.DB = cfg.DB
 	r.cfg = cfg
 	r.AssociatedTableMap = make(map[string]config.AssociatedTableConfig)
 	for _, tc := range cfg.AssociatedTableList {
