@@ -181,24 +181,15 @@ func ParseRouter(cfgList []config.TableConfig) (r *Router, err error) {
 	}
 
 	for _, rule := range r.Rules {
-		var ok = false
-		for _, tableCfg := range cfgList {
-			if rule.Table == tableCfg.TableName {
-				ok = true
-				break
+		for tableName, _ := range rule.AssociatedTableMap {
+			if _, ok := r.Rules[tableName]; !ok {
+				err = errors.Errorf("reference table[%s] not exist", tableName)
+				return nil, err
 			}
-		}
-		if !ok {
-			err = errors.Errorf("reference table[%s] not exist", rule.ReferenceTableName)
-			return nil, err
 		}
 	}
 	return r, err
 }
-
-//func Associate()  {
-//
-//}
 
 func ParseRule(cfg config.TableConfig) (*Rule, error) {
 	r := new(Rule)
