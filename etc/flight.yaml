@@ -9,14 +9,14 @@ log_level: INFO
 #
 schema_path:
   -
-    ./etc/schema/schema_test1.yaml
+    ../etc/schema/schema_test1.yaml
 
 
 node_path:
   -
-    ./etc/node/node1.yaml
+    ../etc/node/node1.yaml
   -
-    ./etc/node/node2.yaml
+    ../etc/node/node2.yaml
 #log_path:
 
 user_list:

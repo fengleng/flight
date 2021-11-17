@@ -780,5 +780,6 @@ func (c *ClientConn) loadResultWithFuncIntoMap(rs []*mysql.Result,
 
 func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) error {
 
+	//c.schema
 	return nil
 }

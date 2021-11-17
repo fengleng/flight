@@ -13,7 +13,11 @@ type Schema struct {
 	DefaultNode *config.NodeConfig
 
 	NodeMap map[string]*config.NodeConfig
-	RuleMap map[string]*config.RuleConfig
+	//TableCfgMap map[string]*config.TableConfig
+	RuleMap     map[string]*router.Rule
+	TableCfgMap map[string]*config.TableConfig
+
+	Router *router.Router
 
 	BackendNode        map[string]*backend_node.Node
 	DefaultBackendNode *backend_node.Node
@@ -60,33 +64,18 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 		schema.BackendNode = backendMap
 	}
 
-	schema.DefaultNode = schema.NodeMap[cfg.DefaultNode]
-	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode], cfg.SchemaName)
-
-	schema.RuleMap = make(map[string]*config.RuleConfig)
-	for _, ruleCfg := range cfg.RuleList {
-		_, ok := schema.NodeMap[ruleCfg.TableName]
-		if ok {
-			err = errors.Errorf("duplicated ruleCfg[%s]", ruleCfg.TableName)
-			return nil, err
-		}
-		if ruleCfg.DefaultNode=="" {
-			ruleCfg.DefaultNode=cfg.DefaultNode
-		}
-		if len(ruleCfg.NodeList) == 0{
-			ruleCfg.NodeList = cfg.NodeList
-		}
-
-		router.ParseRule(&ruleCfg)
-		schema.RuleMap[ruleCfg.TableName] = &ruleCfg
+	if n, ok := schema.NodeMap[cfg.DefaultNode]; !ok {
+		err = errors.Errorf("default node[%s] not exit [%v]", cfg.DefaultNode, cfg.NodeList)
+		return nil, err
+	} else {
+		schema.DefaultNode = n
 	}
-
-	//if err != nil {
-	//	return nil, errors.Trace(err)
-	//}
-
-
-
+	schema.DefaultBackendNode, err = backend_node.ParseNode(*schema.NodeMap[cfg.DefaultNode], cfg.SchemaName)
+	if r, err := router.ParseRouter(cfg.TableList); err != nil {
+		return nil, errors.Trace(err)
+	} else {
+		schema.Router = r
+	}
 
 	return &schema, nil
 }

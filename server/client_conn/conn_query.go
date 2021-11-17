@@ -4,6 +4,7 @@ import (
 	"fmt"
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
+	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
 	"strings"
 )
@@ -33,6 +34,10 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 			}
 		}
 		return nil
+	}
+
+	if c.schema == nil {
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
 
 	var stmt sqlparser.Statement

@@ -4,17 +4,51 @@ default_node: node1
 
 schema_name: flight
 
+#table_list:
+#  - flight_table1
+#  - flight_table2
+#  - flight_table3
 table_list:
-  - flight_table1
-  - flight_table2
-  - flight_table3
-
-rule_list:
-  - table_name: flight_table1
+  -
+    table_name: flight_table1
     key: id
-    type: mod
-    location: [1,1]
-    child_table_list:
-      - reference_col: ff1
-        table_name: flight_table2
-        fk: f1
+    type: hash
+    locations: [1,1]
+    associated_table_list:
+      -
+        reference_table_name: flight_table2
+        reference_col: id
+        fk: flight_table2_id
+#  - table_name: flight_table1
+#    key: id
+#    type: hash
+#    locations: [ 1,1 ]
+#    associated_table_list:
+#      - reference_table_name: flight_table2
+#        reference_col: id
+#        fk: flight_table2_id
+#    rule:
+#      - key: id
+#        type: mod
+#        locations: [1,1]
+#        associated_table_list:
+#          - reference_table: flight_table2
+#            reference_col: id
+#            fk: flight_table2_id
+#  - flight_table2
+#  - flight_table3
+
+#rule_list:
+#  - table_name: flight_table1
+#    key: id
+#    type: mod
+#    locations: [1,1]
+#    child_table_list:
+#      - reference_col: id
+#        table_name: flight_table2
+#        fk: f1
+#
+#associated_table_list:
+#  -
+#    reference_table: flight1
+#    reference_col: id

@@ -34,25 +34,26 @@ type SchemaConfig struct {
 
 	DefaultNode string `yaml:"default_node"`
 
-	RuleList []RuleConfig `yaml:"rule_list"`
+	//RuleList []RuleConfig `yaml:"rule_list"`
+	TableList []TableConfig `yaml:"table_list"`
 }
 
-type RuleConfig struct {
-	TableName      string             `yaml:"table_name"`
-	Key            string             `yaml:"key"`
-	Type           string             `yaml:"type"`
-	Locations      []int              `yaml:"location"`
-	ChildTableList []ChildTableConfig `yaml:"child_table_list"`
-	NodeList       []string           `yaml:"node_list"`
-	DefaultNode    string             `yaml:"default_node"`
-	DateRange      []string           `yaml:"date_range"`
-	TableRowLimit  int                `yaml:"table_row_limit"`
+type TableConfig struct {
+	TableName           string                  `yaml:"table_name"`
+	Key                 string                  `yaml:"key"`
+	Type                string                  `yaml:"type"`
+	Locations           []int                   `yaml:"locations"`
+	AssociatedTableList []AssociatedTableConfig `yaml:"associated_table_list"`
+	NodeList            []string                `yaml:"node_list"`
+	DefaultNode         string                  `yaml:"default_node"`
+	DateRange           []string                `yaml:"date_range"`
+	TableRowLimit       int                     `yaml:"table_row_limit"`
 }
 
-type ChildTableConfig struct {
-	ReferenceCol string `yaml:"reference_col"` //主表列
-	TableName    string `yaml:"table_name"`
-	fk           string `yaml:"fk"`
+type AssociatedTableConfig struct {
+	ReferenceCol       string `yaml:"reference_col"` //主表列
+	ReferenceTableName string `yaml:"reference_table_name"`
+	Fk                 string `yaml:"fk"`
 }
 
 type UserConfig struct {
