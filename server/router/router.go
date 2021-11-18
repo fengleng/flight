@@ -37,7 +37,7 @@ type Rule struct {
 	DefaultNode string
 	NodeList    []string
 
-	SubTableIndexList []int       //SubTableIndexs store all the index of sharding sub-table,sequential
+	SubTableIndexList []int       //SubTableIndexList store all the index of sharding sub-table,sequential
 	TableToNode       map[int]int //key is table index, and value is node index
 
 	Shard Shard
@@ -176,7 +176,7 @@ func parseRuleNode(cfg config.TableConfig, r *Rule) error {
 		}
 		for i := 0; i < len(cfg.Locations); i++ {
 			for j := 0; j < cfg.Locations[i]; j++ {
-				r.SubTableIndexs = append(r.SubTableIndexs, j+sumTables)
+				r.SubTableIndexList = append(r.SubTableIndexList, j+sumTables)
 				r.TableToNode[j+sumTables] = i
 			}
 			sumTables += cfg.Locations[i]
@@ -190,12 +190,12 @@ func parseRuleNode(cfg config.TableConfig, r *Rule) error {
 			if err != nil {
 				return err
 			}
-			currIndexLen := len(r.SubTableIndexs)
-			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= dayNumbers[0] {
+			currIndexLen := len(r.SubTableIndexList)
+			if currIndexLen > 0 && r.SubTableIndexList[currIndexLen-1] >= dayNumbers[0] {
 				return my_errors.ErrDateIllegal
 			}
 			for _, v := range dayNumbers {
-				r.SubTableIndexs = append(r.SubTableIndexs, v)
+				r.SubTableIndexList = append(r.SubTableIndexList, v)
 				r.TableToNode[v] = i
 			}
 		}
@@ -208,12 +208,12 @@ func parseRuleNode(cfg config.TableConfig, r *Rule) error {
 			if err != nil {
 				return err
 			}
-			currIndexLen := len(r.SubTableIndexs)
-			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= monthNumbers[0] {
+			currIndexLen := len(r.SubTableIndexList)
+			if currIndexLen > 0 && r.SubTableIndexList[currIndexLen-1] >= monthNumbers[0] {
 				return my_errors.ErrDateIllegal
 			}
 			for _, v := range monthNumbers {
-				r.SubTableIndexs = append(r.SubTableIndexs, v)
+				r.SubTableIndexList = append(r.SubTableIndexList, v)
 				r.TableToNode[v] = i
 			}
 		}
@@ -226,13 +226,13 @@ func parseRuleNode(cfg config.TableConfig, r *Rule) error {
 			if err != nil {
 				return err
 			}
-			currIndexLen := len(r.SubTableIndexs)
-			if currIndexLen > 0 && r.SubTableIndexs[currIndexLen-1] >= yearNumbers[0] {
+			currIndexLen := len(r.SubTableIndexList)
+			if currIndexLen > 0 && r.SubTableIndexList[currIndexLen-1] >= yearNumbers[0] {
 				return my_errors.ErrDateIllegal
 			}
 			for _, v := range yearNumbers {
 				r.TableToNode[v] = i
-				r.SubTableIndexs = append(r.SubTableIndexs, v)
+				r.SubTableIndexList = append(r.SubTableIndexList, v)
 			}
 		}
 	}

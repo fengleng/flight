@@ -7,6 +7,7 @@ import (
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/go-mysql-client/mysql"
+	"github.com/fengleng/log"
 	"github.com/pingcap/errors"
 	"net"
 	"sync"
@@ -50,6 +51,8 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	}
 
 	StdLog.Info("server running:%v", cfg.Addr)
+
+	log.InitLogger(NewFileLogger())
 	return s, nil
 }
 

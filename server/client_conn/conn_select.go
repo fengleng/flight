@@ -3,9 +3,12 @@ package client_conn
 import (
 	"fmt"
 	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/flight/server/plan"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/util/hack"
 	"github.com/fengleng/go-mysql-client/mysql"
+	"github.com/fengleng/log"
+	"github.com/juju/errors"
 	"strconv"
 	"strings"
 )
@@ -780,6 +783,12 @@ func (c *ClientConn) loadResultWithFuncIntoMap(rs []*mysql.Result,
 
 func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) error {
 
+	plan, err := plan.BuildPlan(stmt, c.schema)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	log.Info("%v", plan)
 	//c.schema
 	return nil
 }
