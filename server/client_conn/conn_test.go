@@ -2,8 +2,10 @@ package client_conn
 
 import (
 	"github.com/fengleng/go-mysql-client/backend"
+	"github.com/fengleng/log"
 	. "github.com/pingcap/check"
 	"testing"
+	"time"
 )
 
 type testT1 struct {
@@ -48,4 +50,9 @@ func (s *testT1) TestUseDb(c *C) {
 		println(string(f.OrgName))
 	}
 	println(result)
+}
+
+func TestLog(t *testing.T) {
+	log.Info("%v", "fsdafasf")
+	time.Sleep(time.Second)
 }

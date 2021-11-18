@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/fengleng/flight/config"
 	"github.com/fengleng/flight/server/my_errors"
-	"github.com/fengleng/flight/server/schema"
 	"github.com/juju/errors"
 )
 
@@ -30,9 +29,9 @@ type Rule struct {
 
 	Type string
 
-	AssociatedTable *config.AssociatedTableConfig
-	IsAssociated    bool
-	AssociatedKey   string
+	ReferenceTable *config.AssociatedTableConfig
+	IsAssociated   bool
+	//ReferenceKey   string
 
 	DefaultNode string
 	NodeList    []string
@@ -47,11 +46,11 @@ type Router struct {
 	Rules map[string]*Rule
 }
 
-func (r *Router) GetRule(tableName string, schema *schema.Schema) *Rule {
+func (r *Router) GetRule(tableName string, defaultNode *config.NodeConfig) *Rule {
 	if rule, ok := r.Rules[tableName]; ok {
 		return rule
 	} else {
-		return NewDefaultRule(schema.DefaultNode.Name)
+		return NewDefaultRule(defaultNode.Name)
 	}
 }
 
@@ -101,14 +100,7 @@ func ParseRouter(cfgList []config.TableConfig, cfg *config.SchemaConfig) (router
 			tableCfg.NodeList = cfg.NodeList
 		}
 
-		var isAssociated bool
-		if tableCfg.Type == "" && tableCfg.AssociatedTable != nil {
-			if !containsTable(tableCfg, cfgList) {
-				return nil, errors.Errorf("[%s] associatedTable [%s] is not found")
-			}
-			isAssociated = true
-		}
-		rule, err := ParseRule(tableCfg, isAssociated)
+		rule, err := ParseRule(tableCfg, cfgList)
 		if err != nil {
 			return nil, errors.Trace(err)
 		}
@@ -118,43 +110,51 @@ func ParseRouter(cfgList []config.TableConfig, cfg *config.SchemaConfig) (router
 	return router, err
 }
 
-func newRule(cfg config.TableConfig, isAssociated bool) *Rule {
-	r := new(Rule)
-	r.cfg = cfg
-
-	r.Table = cfg.TableName
-	r.Key = cfg.Key
-	r.Type = cfg.Type
-
-	if isAssociated {
-		r.AssociatedTable = cfg.AssociatedTable
-		r.IsAssociated = isAssociated
-		r.AssociatedKey = cfg.AssociatedTable.Fk
-	}
-
-	r.DefaultNode = cfg.DefaultNode
-	r.NodeList = cfg.NodeList
-	r.TableToNode = make(map[int]int, 0)
-	return r
-}
-
-func containsTable(table config.TableConfig, cfgList []config.TableConfig) bool {
-	for _, t := range cfgList {
-		if t.TableName == table.AssociatedTable.ReferenceTableName {
-			return true
-		}
-	}
-	return false
-}
-
-func ParseRule(cfg config.TableConfig, isAssociated bool) (*Rule, error) {
+func newRule(cfg config.TableConfig, cfgList []config.TableConfig) (*Rule, error) {
 	if cfg.Type != "" && cfg.AssociatedTable != nil {
 		return nil, errors.Errorf("rule [%s] type, associatedTable only change one", cfg.TableName)
 	}
 	if cfg.Type == "" && cfg.AssociatedTable == nil {
 		return NewDefaultRule(cfg.DefaultNode), nil
 	}
-	r := newRule(cfg, isAssociated)
+
+	r := &Rule{
+		cfg:   cfg,
+		Table: cfg.TableName,
+	}
+
+	if cfg.Type == "" && cfg.AssociatedTable != nil {
+		if ac, ok := containsTable(cfg, cfgList); !ok {
+			return nil, errors.Errorf("[%s] associatedTable [%s] is not found")
+		} else {
+			r.ReferenceTable = cfg.AssociatedTable
+			r.IsAssociated = true
+			r.Key = cfg.AssociatedTable.Fk
+			r.Type = ac.Type
+			//r.ReferenceKey = cfg.AssociatedTable.ReferenceCol
+		}
+	}
+
+	r.DefaultNode = cfg.DefaultNode
+	r.NodeList = cfg.NodeList
+	r.TableToNode = make(map[int]int, 0)
+	return r, nil
+}
+
+func containsTable(table config.TableConfig, cfgList []config.TableConfig) (config.TableConfig, bool) {
+	for _, t := range cfgList {
+		if t.TableName == table.AssociatedTable.ReferenceTableName {
+			return t, true
+		}
+	}
+	return config.TableConfig{}, false
+}
+
+func ParseRule(cfg config.TableConfig, cfgList []config.TableConfig) (*Rule, error) {
+	r, err := newRule(cfg, cfgList)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
 
 	if err := parseRuleNode(cfg, r); err != nil {
 		return nil, errors.Trace(err)

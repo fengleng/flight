@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/router"
@@ -47,6 +48,7 @@ type Plan struct {
 	Criteria            sqlparser.Expr
 	RouteTableIndexList []int
 	RouteNodeIndexList  []int
+	RewrittenSqlList    map[string][]string
 }
 
 func BuildPlan(statement sqlparser.Statement, schema *schema.Schema) (*Plan, error) {
@@ -87,7 +89,7 @@ func buildSelectPlan(statement sqlparser.Statement, schema *schema.Schema) (*Pla
 		tableName = sqlparser.String(v)
 	}
 
-	plan.Rule = schema.Router.GetRule(tableName, schema) //根据表名获得分表规则
+	plan.Rule = schema.Router.GetRule(tableName, schema.DefaultNode) //根据表名获得分表规则
 
 	where = stmt.Where
 	if where != nil {
@@ -97,7 +99,12 @@ func buildSelectPlan(statement sqlparser.Statement, schema *schema.Schema) (*Pla
 			Log.Error("BuildSelectPlan err:%v", err)
 			return nil, errors.Trace(err)
 		}
+	} else {
+		//if shard select without where,send to all nodes and all tables
+		plan.RouteTableIndexList = plan.Rule.SubTableIndexList
+		plan.RouteNodeIndexList = makeList(0, len(plan.Rule.NodeList))
 	}
+	err = plan.generateSelectSql(stmt)
 
 	return plan, err
 }
@@ -132,7 +139,7 @@ func (plan *Plan) getTableIndexByExpr(node sqlparser.Expr) ([]int, error) {
 			left := plan.getValueType(node.Left)
 			right := plan.getValueType(node.Right)
 			if (left == EID_NODE && right == VALUE_NODE) || (left == VALUE_NODE && right == EID_NODE) {
-				return plan.getTableIndexs(node)
+				return plan.getTableIndexList(node)
 			}
 			//case sqlparser.StringIn(node.Operator, "in", "not in"):
 			//	left := plan.getValueType(node.Left)
@@ -148,7 +155,82 @@ func (plan *Plan) getTableIndexByExpr(node sqlparser.Expr) ([]int, error) {
 	return plan.Rule.SubTableIndexList, nil
 }
 
-func (plan *Plan) getTableIndexs(expr sqlparser.Expr) ([]int, error) {
+func (plan *Plan) generateSelectSql(stmt sqlparser.Statement) error {
+	rewrittenSqlList := make(map[string][]string)
+	node, ok := stmt.(*sqlparser.Select)
+	if ok == false {
+		return my_errors.ErrStmtConvert
+	}
+	if len(plan.RouteNodeIndexList) == 0 {
+		return my_errors.ErrNoRouteNode
+	}
+	if len(plan.RouteTableIndexList) == 0 {
+		buf := sqlparser.NewTrackedBuffer(nil)
+		stmt.Format(buf)
+		nodeName := plan.Rule.NodeList[0]
+		rewrittenSqlList[nodeName] = []string{buf.String()}
+	} else {
+		tableCount := len(plan.RouteTableIndexList)
+		for i := 0; i < tableCount; i++ {
+			tableIndex := plan.RouteTableIndexList[i]
+			nodeIndex := plan.Rule.TableToNode[tableIndex]
+			nodeName := plan.Rule.NodeList[nodeIndex]
+			selectSql := plan.rewriteSelectSql(node, tableIndex)
+			if _, ok := rewrittenSqlList[nodeName]; ok == false {
+				rewrittenSqlList[nodeName] = make([]string, 0, tableCount)
+			}
+			rewrittenSqlList[nodeName] = append(rewrittenSqlList[nodeName], selectSql)
+		}
+	}
+	plan.RewrittenSqlList = rewrittenSqlList
+	return nil
+}
+
+//rewrite select sql
+func (plan *Plan) rewriteSelectSql(node *sqlparser.Select, tableIndex int) string {
+	buf := sqlparser.NewTrackedBuffer(nil)
+	for _, expr := range node.SelectExprs {
+		switch v := expr.(type) {
+		case *sqlparser.StarExpr:
+			//for shardTable.*,need replace table into shardTable_xxxx.
+			if sqlparser.String(v.TableName) == plan.Rule.Table {
+				oldName := v.TableName
+				v.TableName = sqlparser.TableName{
+					Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", oldName.Name.String(), tableIndex)),
+					Qualifier: sqlparser.NewTableIdent(oldName.Qualifier.String()),
+				}
+			}
+		case *sqlparser.AliasedExpr:
+			if colName, ok := v.Expr.(*sqlparser.ColName); ok {
+				if sqlparser.String(colName.Qualifier) == plan.Rule.Table {
+					oldQualifier := colName.Qualifier
+					colName.Qualifier = sqlparser.TableName{
+						Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", oldQualifier.Name.String(), tableIndex)),
+						Qualifier: sqlparser.NewTableIdent(oldQualifier.Qualifier.String()),
+					}
+					colName.Format(buf)
+				}
+			}
+		}
+	}
+
+	switch v := (node.From[0]).(type) {
+	case *sqlparser.AliasedTableExpr:
+		switch o := v.Expr.(type) {
+		case sqlparser.TableName:
+			v.Expr = sqlparser.TableName{
+				Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", o.Name.String(), tableIndex)),
+				Qualifier: sqlparser.NewTableIdent(o.Qualifier.String()),
+			}
+		}
+	}
+
+	node.Format(buf)
+
+	return buf.String()
+}
+
+func (plan *Plan) getTableIndexList(expr sqlparser.Expr) ([]int, error) {
 	switch plan.Rule.Type {
 	case router.HashRuleType:
 		return plan.getHashShardTableIndex(expr)

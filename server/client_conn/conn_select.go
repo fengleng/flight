@@ -790,5 +790,5 @@ func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) er
 
 	log.Info("%v", plan)
 	//c.schema
-	return nil
+	return errors.Errorf("not implement")
 }
