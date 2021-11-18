@@ -8,6 +8,7 @@ import (
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/juju/errors"
+	"strings"
 )
 
 const (
@@ -15,6 +16,10 @@ const (
 	VALUE_NODE
 	LIST_NODE
 	OTHER_NODE
+)
+
+const (
+	MasterComment = "/*master*/"
 )
 
 func (plan *Plan) getValueType(valExpr sqlparser.Expr) int {
@@ -49,9 +54,12 @@ type Plan struct {
 	RouteTableIndexList []int
 	RouteNodeIndexList  []int
 	RewrittenSqlList    map[string][]string
+
+	FromSlave bool
 }
 
 func BuildPlan(statement sqlparser.Statement, schema *schema.Schema) (*Plan, error) {
+
 	switch stmt := statement.(type) {
 	//case *sqlparser.Insert:
 	//	return r.buildInsertPlan(db, stmt)
@@ -91,21 +99,33 @@ func buildSelectPlan(statement sqlparser.Statement, schema *schema.Schema) (*Pla
 
 	plan.Rule = schema.Router.GetRule(tableName, schema.DefaultNode) //根据表名获得分表规则
 
-	where = stmt.Where
-	if where != nil {
-		plan.Criteria = where.Expr //路由条件
-		err = plan.calRouteIndexList()
-		if err != nil {
-			Log.Error("BuildSelectPlan err:%v", err)
-			return nil, errors.Trace(err)
+	//DefaultRuleType 不分库分表==》defaultNode
+	if plan.Rule.Type != router.DefaultRuleType {
+		where = stmt.Where
+		if where != nil {
+			plan.Criteria = where.Expr //路由条件
+			err = plan.calRouteIndexList()
+			if err != nil {
+				Log.Error("BuildSelectPlan err:%v", err)
+				return nil, errors.Trace(err)
+			}
+		} else {
+			//if shard select without where,send to all nodes and all tables
+			plan.RouteTableIndexList = plan.Rule.SubTableIndexList
+			plan.RouteNodeIndexList = makeList(0, len(plan.Rule.NodeList))
 		}
 	} else {
-		//if shard select without where,send to all nodes and all tables
-		plan.RouteTableIndexList = plan.Rule.SubTableIndexList
-		plan.RouteNodeIndexList = makeList(0, len(plan.Rule.NodeList))
+		plan.RouteNodeIndexList = []int{0}
 	}
 	err = plan.generateSelectSql(stmt)
-
+	var fromSlave = true
+	if 0 < len(stmt.Comments) {
+		comment := string(stmt.Comments[0])
+		if 0 < len(comment) && strings.ToLower(comment) == MasterComment {
+			fromSlave = false
+		}
+	}
+	plan.FromSlave = fromSlave
 	return plan, err
 }
 
@@ -175,7 +195,10 @@ func (plan *Plan) generateSelectSql(stmt sqlparser.Statement) error {
 			tableIndex := plan.RouteTableIndexList[i]
 			nodeIndex := plan.Rule.TableToNode[tableIndex]
 			nodeName := plan.Rule.NodeList[nodeIndex]
-			selectSql := plan.rewriteSelectSql(node, tableIndex)
+			selectSql, err := plan.rewriteSelectSql(node, tableIndex)
+			if err != nil {
+				return errors.Trace(err)
+			}
 			if _, ok := rewrittenSqlList[nodeName]; ok == false {
 				rewrittenSqlList[nodeName] = make([]string, 0, tableCount)
 			}
@@ -187,7 +210,17 @@ func (plan *Plan) generateSelectSql(stmt sqlparser.Statement) error {
 }
 
 //rewrite select sql
-func (plan *Plan) rewriteSelectSql(node *sqlparser.Select, tableIndex int) string {
+func (plan *Plan) rewriteSelectSql(statement *sqlparser.Select, tableIndex int) (string, error) {
+	inBuf := sqlparser.NewTrackedBuffer(nil)
+	statement.Format(inBuf)
+	newSql := inBuf.String()
+
+	node2, err := sqlparser.Parse(newSql)
+	if err != nil {
+		return "", errors.Trace(err)
+	}
+	node := node2.(*sqlparser.Select)
+
 	buf := sqlparser.NewTrackedBuffer(nil)
 	for _, expr := range node.SelectExprs {
 		switch v := expr.(type) {
@@ -226,8 +259,7 @@ func (plan *Plan) rewriteSelectSql(node *sqlparser.Select, tableIndex int) strin
 	}
 
 	node.Format(buf)
-
-	return buf.String()
+	return buf.String(), nil
 }
 
 func (plan *Plan) getTableIndexList(expr sqlparser.Expr) ([]int, error) {
@@ -273,13 +305,13 @@ func (plan *Plan) getHashShardTableIndex(expr sqlparser.Expr) ([]int, error) {
 				return nil, err
 			}
 			return []int{index}, nil
-			//case "<", "<=", ">", ">=", "not in":
-			//	return plan.Rule.SubTableIndexList, nil
+		case "<", "<=", ">", ">=", "not in":
+			return plan.Rule.SubTableIndexList, nil
 			//case "in":
 			//	return plan.getTableIndexsByTuple(criteria.Right)
 		}
-	//case *sqlparser.RangeCond: //between ... and ...
-	//	return plan.Rule.SubTableIndexList, nil
+	case *sqlparser.RangeCond: //between ... and ...
+		return plan.Rule.SubTableIndexList, nil
 	default:
 		return plan.Rule.SubTableIndexList, nil
 	}

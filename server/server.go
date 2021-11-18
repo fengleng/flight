@@ -3,11 +3,10 @@ package server
 import (
 	"crypto/tls"
 	"github.com/fengleng/flight/config"
-	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/go-mysql-client/mysql"
-	"github.com/fengleng/log"
 	"github.com/pingcap/errors"
 	"net"
 	"sync"
@@ -50,9 +49,9 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	StdLog.Info("server running:%v", cfg.Addr)
+	log.Info("server running:%v", cfg.Addr)
 
-	log.InitLogger(NewFileLogger())
+	log.InitLogger(log.NewFileLogger(log.CfgOptionSkip(4)))
 	return s, nil
 }
 

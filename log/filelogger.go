@@ -1,4 +1,4 @@
-package test
+package log
 
 import (
 	"github.com/fengleng/go-common/fileutil"

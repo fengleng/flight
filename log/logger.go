@@ -1,4 +1,4 @@
-package test
+package log
 
 type Logger interface {
 	Debug(format string, a ...interface{})

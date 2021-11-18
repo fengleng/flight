@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 )
 import (
-	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/log"
 )
 
 type Config struct {
@@ -62,26 +62,26 @@ type NodeConfig struct {
 func ParseConfig(path string) (*Config, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		StdLog.Fatal("parse config err :%v", err)
+		log.Fatal("parse config err :%v", err)
 		return nil, err
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		StdLog.Fatal("parse config err :%v", err)
+		log.Fatal("parse config err :%v", err)
 		return nil, err
 	}
 
 	for _, p := range cfg.SchemaPath {
 		data2, err := ioutil.ReadFile(p)
 		if err != nil {
-			StdLog.Fatal("parse config err :%v", err)
+			log.Fatal("parse config err :%v", err)
 			return nil, err
 		}
 		var sc SchemaConfig
 		err = yaml.Unmarshal(data2, &sc)
 		if err != nil {
-			StdLog.Fatal("parse config err :%v", err)
+			log.Fatal("parse config err :%v", err)
 			return nil, err
 		}
 		cfg.SchemaList = append(cfg.SchemaList, sc)

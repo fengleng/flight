@@ -55,13 +55,12 @@ func (r *Router) GetRule(tableName string, defaultNode *config.NodeConfig) *Rule
 }
 
 func NewDefaultRule(node string) *Rule {
-	var r *Rule = &Rule{
+	return &Rule{
 		Type:        DefaultRuleType,
 		NodeList:    []string{node},
 		Shard:       new(DefaultShard),
 		TableToNode: nil,
 	}
-	return r
 }
 
 func (r *Rule) FindNode(key interface{}) (string, error) {
@@ -133,6 +132,9 @@ func newRule(cfg config.TableConfig, cfgList []config.TableConfig) (*Rule, error
 			r.Type = ac.Type
 			//r.ReferenceKey = cfg.AssociatedTable.ReferenceCol
 		}
+	} else {
+		r.Key = cfg.Key
+		r.Type = cfg.Type
 	}
 
 	r.DefaultNode = cfg.DefaultNode

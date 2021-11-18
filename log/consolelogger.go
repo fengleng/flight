@@ -1,4 +1,4 @@
-package test
+package log
 
 func NewConsoleLogger(opts ...CfgOption) Logger {
 	cfg := defaultLogCfg

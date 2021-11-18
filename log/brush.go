@@ -1,4 +1,4 @@
-package test
+package log
 
 // Brush is pretty string
 type Brush func(string) string

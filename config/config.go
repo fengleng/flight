@@ -1,7 +1,7 @@
 package config
 
 import (
-	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/log"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/juju/errors"
 	"gopkg.in/yaml.v2"
@@ -77,32 +77,32 @@ type NodeConfig struct {
 func ParseConfig(path string) (*Config, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		StdLog.Fatal("parse config err :%v", err)
+		log.Fatal("parse config err :%v", err)
 		return nil, err
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		StdLog.Fatal("parse config err :%v", err)
+		log.Fatal("parse config err :%v", err)
 		return nil, err
 	}
 
 	for _, p := range cfg.NodePath {
 		data2, err := ioutil.ReadFile(p)
 		if err != nil {
-			StdLog.Fatal("parse config err :%v", err)
+			log.Fatal("parse config err :%v", err)
 			return nil, err
 		}
 		var nc NodeConfig
 		err = yaml.Unmarshal(data2, &nc)
 		if err != nil {
-			StdLog.Fatal("parse config err :%v", err)
+			log.Fatal("parse config err :%v", err)
 			return nil, err
 		}
 		nc.Name = strings.Trim(nc.Name, " ")
 		if isContainsNode(nc.Name, cfg.NodeList) {
 			err := errors.Errorf("node[%s] duplicated", nc.Name)
-			StdLog.Fatal("%v", err)
+			log.Fatal("%v", err)
 			return nil, err
 		}
 		cfg.NodeList = append(cfg.NodeList, nc)
@@ -111,13 +111,13 @@ func ParseConfig(path string) (*Config, error) {
 	for _, p := range cfg.SchemaPath {
 		data2, err := ioutil.ReadFile(p)
 		if err != nil {
-			StdLog.Fatal("parse config err :%v", err)
+			log.Fatal("parse config err :%v", err)
 			return nil, err
 		}
 		var sc SchemaConfig
 		err = yaml.Unmarshal(data2, &sc)
 		if err != nil {
-			StdLog.Fatal("parse config err :%v", err)
+			log.Fatal("parse config err :%v", err)
 			return nil, err
 		}
 		var nodeCfgList []NodeConfig
@@ -125,13 +125,13 @@ func ParseConfig(path string) (*Config, error) {
 
 			if isContainsNode(nodeName, nodeCfgList) {
 				err := errors.Errorf("schema[%s] node[%s] duplicated", sc.SchemaName, nodeName)
-				StdLog.Fatal("%v", err)
+				log.Fatal("%v", err)
 				return nil, err
 			}
 
 			if nodeCfg, ok := findGlobalNodeCfg(nodeName, cfg.NodeList); !ok {
 				err := errors.Errorf("schema[%s] node[%s] not exist", sc.SchemaName, nodeName)
-				StdLog.Fatal("%v", err)
+				log.Fatal("%v", err)
 				return nil, err
 			} else {
 				sc.NodeCfgList = append(sc.NodeCfgList, nodeCfg)

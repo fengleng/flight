@@ -2,15 +2,19 @@ package client_conn
 
 import (
 	"fmt"
+	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/plan"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/util/hack"
+	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/fengleng/log"
 	"github.com/juju/errors"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 const (
@@ -782,13 +786,119 @@ func (c *ClientConn) loadResultWithFuncIntoMap(rs []*mysql.Result,
 }
 
 func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) error {
-
-	plan, err := plan.BuildPlan(stmt, c.schema)
+	exePlan, err := plan.BuildPlan(stmt, c.schema)
 	if err != nil {
 		return errors.Trace(err)
 	}
 
-	log.Info("%v", plan)
-	//c.schema
-	return errors.Errorf("not implement")
+	var rs []*mysql.Result
+	rs, err = c.executeInMultiNodes(exePlan, args)
+	if err != nil {
+		log.Info("handleSelect executeInMultiNodes %v connectId: %d", err, c.connectionId)
+		return errors.Trace(err)
+	}
+	err = c.mergeSelectResult(rs, stmt)
+	if err != nil {
+		log.Info("handleSelect mergeSelectResult %v connectId: %d", err, c.connectionId)
+		return errors.Trace(err)
+	}
+	return nil
+}
+
+func (c *ClientConn) GetShardDb(exePlan *plan.Plan) (map[string]*backend.DB, error) {
+
+	var dbMap = make(map[string]*backend.DB)
+	nodesCount := len(exePlan.RouteNodeIndexList)
+	backendNodeMap := make(map[string]*backend_node.Node)
+	for i := 0; i < nodesCount; i++ {
+		nodeIndex := exePlan.RouteNodeIndexList[i]
+		if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
+			backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
+		} else {
+			backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
+		}
+	}
+	if len(backendNodeMap) == 0 {
+		return nil, my_errors.ErrNoPlan
+	}
+	for nodeName, node := range backendNodeMap {
+		dbMap[nodeName] = node.GetDb(exePlan.FromSlave)
+	}
+	return dbMap, nil
+}
+
+func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{}) ([]*mysql.Result, error) {
+	var err error
+	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
+		return nil, my_errors.ErrNoRouteNode
+	}
+
+	//nodesCount := len(exePlan.RouteNodeIndexList)
+	//backendNodeMap := make(map[string]*backend_node.Node)
+	//for i := 0; i < nodesCount; i++ {
+	//	nodeIndex := exePlan.RouteNodeIndexList[i]
+	//	if backendNode,ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]];!ok{
+	//		backendNodeMap[c.schema.DefaultNode.Name]=c.schema.DefaultBackendNode
+	//	}else {
+	//		backendNodeMap[exePlan.Rule.NodeList[nodeIndex]]=backendNode
+	//	}
+	//}
+	//
+	//if len(backendNodeMap)==0 {
+	//	return nil,my_errors.ErrNoPlan
+	//}
+	dbMap, err := c.GetShardDb(exePlan)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(dbMap))
+
+	resultCount := 0
+	for _, sqlSlice := range exePlan.RewrittenSqlList {
+		resultCount += len(sqlSlice)
+	}
+
+	rs := make([]interface{}, resultCount)
+
+	f := func(rs []interface{}, i int, sqlList []string, co *backend.DB) {
+		var state string
+		for _, v := range sqlList {
+			startTime := time.Now().UnixNano()
+			r, err := co.Execute(v, args...)
+			if err != nil {
+				state = "ERROR"
+				rs[i] = err
+			} else {
+				state = "OK"
+				rs[i] = r
+			}
+			execTime := float64(time.Now().UnixNano()-startTime) / float64(time.Millisecond)
+			log.Info("%s %.1fms - %s->%s", state, execTime, c.c.RemoteAddr(), c.db)
+			i++
+		}
+		wg.Done()
+	}
+
+	offset := 0
+	for nodeName, db := range dbMap {
+		sqlList := exePlan.RewrittenSqlList[nodeName]
+		go f(rs, offset, sqlList, db)
+		offset += len(sqlList)
+	}
+	wg.Wait()
+
+	r := make([]*mysql.Result, resultCount)
+	for i, v := range rs {
+		if e, ok := v.(error); ok {
+			err = e
+			break
+		}
+		if rs[i] != nil {
+			r[i] = rs[i].(*mysql.Result)
+		}
+	}
+
+	return r, err
 }

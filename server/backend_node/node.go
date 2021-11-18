@@ -5,6 +5,7 @@ import (
 	"github.com/fengleng/flight/config"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/go-mysql-client/backend"
+	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
 	"time"
 )
@@ -17,6 +18,14 @@ type Node struct {
 	Cfg    config.NodeConfig
 	DbName string
 	Online bool
+}
+
+func (n *Node) GetDb(fromSlave bool) *backend.DB {
+	if fromSlave {
+		return n.SlaveList[0]
+	} else {
+		return n.Master
+	}
 }
 
 func ParseNodeList(cfgList []config.NodeConfig, schemaName string) (map[string]*Node, error) {
@@ -104,4 +113,12 @@ func (n *Node) UseDb(dbName string) error {
 	n.DbName = dbName
 
 	return nil
+}
+
+func (n *Node) Execute(command string, fromSlave bool, args ...interface{}) (*mysql.Result, error) {
+	if fromSlave {
+		return n.SlaveList[0].Execute(command, args...)
+	} else {
+		return n.Master.Execute(command, args...)
+	}
 }

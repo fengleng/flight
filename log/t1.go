@@ -1,4 +1,4 @@
-package test
+package log
 
 var name = "hh"
 

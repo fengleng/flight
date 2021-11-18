@@ -1,4 +1,4 @@
-package test
+package log
 
 import (
 	"testing"
@@ -14,13 +14,13 @@ func TestT2(t *testing.T) {
 	//g := NewConsoleLogger()
 	g.Error("dfsafasf")
 
-	StdLog.Fatal("sdfsadfas")
+	log.Fatal("sdfsadfas")
 
 	go func() {
 		for {
 			time.Sleep(time.Second)
 			g.Error("dfsafasf")
-			StdLog.Info("vsdfasdfasdfa")
+			log.Info("vsdfasdfasdfa")
 		}
 	}()
 	time.Sleep(time.Second * 60)

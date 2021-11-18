@@ -1,4 +1,4 @@
-package test
+package log
 
 import (
 	"testing"
@@ -7,10 +7,10 @@ import (
 
 func TestT1(t *testing.T) {
 	StdLog = NewConsoleLogger(CfgOptionSkip(3), LogLevelCfgOption(DEBUG))
-	StdLog.Debug("fsdfsd")
-	StdLog.Info("fsdfsd")
-	StdLog.Warn("fsdfsd")
-	StdLog.Error("fsdfsd")
-	StdLog.Fatal("fsdfsd")
+	log.Debug("fsdfsd")
+	log.Info("fsdfsd")
+	log.Warn("fsdfsd")
+	log.Error("fsdfsd")
+	log.Fatal("fsdfsd")
 	time.Sleep(10 * time.Second)
 }
