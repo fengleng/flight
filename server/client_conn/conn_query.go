@@ -50,8 +50,8 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 	switch v := stmt.(type) {
 	case *sqlparser.Select:
 		return c.handleSelect(v, nil)
-	//case *sqlparser.Insert:
-	//	return c.handleExec(stmt, nil)
+	case *sqlparser.Insert:
+		return c.handleExec(stmt, nil)
 	//case *sqlparser.Update:
 	//	return c.handleExec(stmt, nil)
 	//case *sqlparser.Delete:

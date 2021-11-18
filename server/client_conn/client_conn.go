@@ -76,12 +76,6 @@ func NewClientConn(co net.Conn, s *server.Server) *ClientConn {
 	return c
 }
 
-//func (c *ClientConn) SetProxyServer(s *Server) {
-//	c.proxy = s
-//	c.charset = s.Cfg.Charset
-//	c.collation = s.Cfg.Collation
-//}
-
 func (c *ClientConn) writeOK(r *mysql.Result) error {
 	if r == nil {
 		r = &mysql.Result{Status: c.status}

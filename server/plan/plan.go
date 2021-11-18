@@ -50,19 +50,23 @@ type Plan struct {
 	Rule   *router.Rule
 	Schema *schema.Schema
 
-	Criteria            sqlparser.Expr
 	RouteTableIndexList []int
 	RouteNodeIndexList  []int
 	RewrittenSqlList    map[string][]string
 
 	FromSlave bool
+
+	KeyIndex int
+	Rows     map[int]sqlparser.Values //insert 条件
+
+	Criteria sqlparser.SQLNode
 }
 
 func BuildPlan(statement sqlparser.Statement, schema *schema.Schema) (*Plan, error) {
 
 	switch stmt := statement.(type) {
-	//case *sqlparser.Insert:
-	//	return r.buildInsertPlan(db, stmt)
+	case *sqlparser.Insert:
+		return buildInsertPlan(stmt, schema)
 	//case *sqlparser.Replace:
 	//	return r.buildReplacePlan(db, stmt)
 	case *sqlparser.Select:
@@ -543,6 +547,13 @@ func (plan *Plan) calRouteIndexList() error {
 	var err error
 	nodesCount := len(plan.Rule.NodeList)
 	switch criteria := plan.Criteria.(type) {
+	case sqlparser.Values: //代表insert中values
+		plan.RouteTableIndexList, err = plan.getInsertTableIndex(criteria)
+		if err != nil {
+			return err
+		}
+		plan.RouteNodeIndexList = plan.TIndexListToNIndexList(plan.RouteTableIndexList)
+		return nil
 	case sqlparser.Expr:
 		plan.RouteTableIndexList, err = plan.getTableIndexByExpr(criteria)
 		if err != nil {

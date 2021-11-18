@@ -833,20 +833,6 @@ func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{})
 		return nil, my_errors.ErrNoRouteNode
 	}
 
-	//nodesCount := len(exePlan.RouteNodeIndexList)
-	//backendNodeMap := make(map[string]*backend_node.Node)
-	//for i := 0; i < nodesCount; i++ {
-	//	nodeIndex := exePlan.RouteNodeIndexList[i]
-	//	if backendNode,ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]];!ok{
-	//		backendNodeMap[c.schema.DefaultNode.Name]=c.schema.DefaultBackendNode
-	//	}else {
-	//		backendNodeMap[exePlan.Rule.NodeList[nodeIndex]]=backendNode
-	//	}
-	//}
-	//
-	//if len(backendNodeMap)==0 {
-	//	return nil,my_errors.ErrNoPlan
-	//}
 	dbMap, err := c.GetShardDb(exePlan)
 	if err != nil {
 		return nil, errors.Trace(err)
