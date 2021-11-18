@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/fengleng/flight/config"
 	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/flight/server/schema"
 	"github.com/juju/errors"
 )
 
@@ -36,14 +37,22 @@ type Rule struct {
 	DefaultNode string
 	NodeList    []string
 
-	SubTableIndexs []int       //SubTableIndexs store all the index of sharding sub-table,sequential
-	TableToNode    map[int]int //key is table index, and value is node index
+	SubTableIndexList []int       //SubTableIndexs store all the index of sharding sub-table,sequential
+	TableToNode       map[int]int //key is table index, and value is node index
 
 	Shard Shard
 }
 
 type Router struct {
 	Rules map[string]*Rule
+}
+
+func (r *Router) GetRule(tableName string, schema *schema.Schema) *Rule {
+	if rule, ok := r.Rules[tableName]; ok {
+		return rule
+	} else {
+		return NewDefaultRule(schema.DefaultNode.Name)
+	}
 }
 
 func NewDefaultRule(node string) *Rule {
@@ -117,9 +126,11 @@ func newRule(cfg config.TableConfig, isAssociated bool) *Rule {
 	r.Key = cfg.Key
 	r.Type = cfg.Type
 
-	r.AssociatedTable = cfg.AssociatedTable
-	r.IsAssociated = isAssociated
-	r.AssociatedKey = cfg.AssociatedTable.Fk
+	if isAssociated {
+		r.AssociatedTable = cfg.AssociatedTable
+		r.IsAssociated = isAssociated
+		r.AssociatedKey = cfg.AssociatedTable.Fk
+	}
 
 	r.DefaultNode = cfg.DefaultNode
 	r.NodeList = cfg.NodeList
