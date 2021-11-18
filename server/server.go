@@ -51,7 +51,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	log.Info("server running:%v", cfg.Addr)
 
-	log.InitLogger(log.NewFileLogger(log.CfgOptionSkip(4)))
+	log.InitLogger(log.NewFileLogger(log.CfgOptionSkip(5)))
 	return s, nil
 }
 
