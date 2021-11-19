@@ -5,7 +5,7 @@ import (
 	"github.com/fengleng/flight/server/plan"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/fengleng/go-mysql-client/mysql"
-	"github.com/juju/errors"
+	"github.com/pingcap/errors"
 )
 
 func (c *ClientConn) handleExec(stmt sqlparser.Statement, args []interface{}) error {

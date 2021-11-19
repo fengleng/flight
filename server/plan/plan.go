@@ -71,8 +71,8 @@ func BuildPlan(statement sqlparser.Statement, schema *schema.Schema) (*Plan, err
 	//	return r.buildReplacePlan(db, stmt)
 	case *sqlparser.Select:
 		return buildSelectPlan(stmt, schema)
-		//case *sqlparser.Update:
-		//	return r.buildUpdatePlan(db, stmt)
+	case *sqlparser.Update:
+		return buildUpdatePlan(stmt, schema)
 		//case *sqlparser.Delete:
 		//	return r.buildDeletePlan(db, stmt)
 		//case *sqlparser.Truncate:
