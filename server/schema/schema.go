@@ -79,3 +79,7 @@ func ParseSchema(cfg *config.SchemaConfig) (*Schema, error) {
 
 	return &schema, nil
 }
+
+func (s *Schema) FindNodeIndex(rule *router.Rule, key interface{}) (int, error) {
+	return s.Router.FindNodeIndex(rule, key)
+}

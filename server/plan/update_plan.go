@@ -20,30 +20,39 @@ func buildUpdatePlan(statement sqlparser.Statement, schema *schema.Schema) (*Pla
 		return nil, err
 	}
 
-	where = stmt.Where
-	if where != nil {
-		plan.Criteria = where.Expr //路由条件
-		err := plan.calRouteIndexList()
-		if err != nil {
-			log.Error("plan calRouteIndexList %v", err.Error())
-			return nil, err
-		}
-	} else {
-		//if shard update without where,send to all nodes and all tables
-		plan.RouteTableIndexList = plan.Rule.SubTableIndexList
-		plan.RouteNodeIndexList = makeList(0, len(plan.Rule.NodeList))
+	plan.Criteria = where
+	if err := plan.calRouteIndexList(); err != nil {
+		log.Error("calRouteIndexList err:%v", err)
+		return nil, errors.Trace(err)
 	}
 
 	if plan.Rule.Type != router.DefaultRuleType && len(plan.RouteTableIndexList) == 0 {
 		log.Error("Route BuildUpdatePlan %v", my_errors.ErrNoCriteria.Error())
 		return nil, my_errors.ErrNoCriteria
 	}
+	if err := plan.checkUpdateTable(stmt); err != nil {
+		return nil, errors.Trace(err)
+	}
+
 	//generate sql,如果routeTableindexs为空则表示不分表，不分表则发default node
-	err = plan.generateUpdateSql(stmt)
+	err := plan.generateUpdateSql(stmt)
 	if err != nil {
 		return nil, err
 	}
 	return plan, nil
+}
+
+func (plan *Plan) checkUpdateTable(update *sqlparser.Update) error {
+	if len(update.TableExprs) != 1 {
+		return my_errors.ErrUpdateTooComplex
+	}
+	if len(update.TableExprs) == 1 {
+		_, ok := update.TableExprs[0].(*sqlparser.AliasedTableExpr)
+		if !ok {
+			return my_errors.ErrUpdateTooComplex
+		}
+	}
+	return nil
 }
 
 func (plan *Plan) generateUpdateSql(stmt sqlparser.Statement) error {
@@ -64,10 +73,7 @@ func (plan *Plan) generateUpdateSql(stmt sqlparser.Statement) error {
 		tableCount := len(plan.RouteTableIndexList)
 		for i := 0; i < tableCount; i++ {
 			buf := sqlparser.NewTrackedBuffer(nil)
-			buf.Fprintf("update %v%v",
-				node.Comments,
-				node.Table,
-			)
+
 			inBuf := sqlparser.NewTrackedBuffer(nil)
 			node.Format(inBuf)
 			node1, err := sqlparser.Parse(inBuf.String())
@@ -75,26 +81,34 @@ func (plan *Plan) generateUpdateSql(stmt sqlparser.Statement) error {
 				return errors.Trace(err)
 			}
 			node2 := node1.(*sqlparser.Update)
-
-			node2.TableExprs =
-
-				fmt.Fprintf(buf, "_%04d", plan.RouteTableIndexs[i])
-			buf.Fprintf(" set %v%v%v%v",
-				node.Exprs,
-				node.Where,
-				node.OrderBy,
-				node.Limit,
-			)
-			tableIndex := plan.RouteTableIndexs[i]
-			nodeIndex := plan.Rule.TableToNode[tableIndex]
-			nodeName := r.Nodes[nodeIndex]
-			if _, ok := sqls[nodeName]; ok == false {
-				sqls[nodeName] = make([]string, 0, tableCount)
+			TableExpr, ok := node2.TableExprs[0].(*sqlparser.AliasedTableExpr)
+			if !ok {
+				return my_errors.ErrUpdateTooComplex
 			}
-			sqls[nodeName] = append(sqls[nodeName], buf.String())
+			tableName, ok := TableExpr.Expr.(*sqlparser.TableName)
+			if !ok {
+				return my_errors.ErrUpdateTooComplex
+			}
+			node2.TableExprs[0] = &sqlparser.AliasedTableExpr{
+				Expr: &sqlparser.TableName{
+					Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", sqlparser.String(tableName.Name), plan.RouteTableIndexList[i])),
+					Qualifier: sqlparser.NewTableIdent(sqlparser.String(tableName.Qualifier)),
+				},
+				As:    TableExpr.As,
+				Hints: TableExpr.Hints,
+			}
+			node2.Format(buf)
+
+			tableIndex := plan.RouteTableIndexList[i]
+			nodeIndex := plan.Rule.TableToNode[tableIndex]
+			nodeName := plan.Rule.NodeList[nodeIndex]
+			if _, ok := sqlList[nodeName]; !ok {
+				sqlList[nodeName] = make([]string, 0, tableCount)
+			}
+			sqlList[nodeName] = append(sqlList[nodeName], buf.String())
 		}
 
 	}
-	plan.RewrittenSqls = sqls
+	plan.RewrittenSqlList = sqlList
 	return nil
 }

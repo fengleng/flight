@@ -113,7 +113,7 @@ func (plan *Plan) generateInsertSql(stmt sqlparser.Statement) error {
 			node3 := node2.(*sqlparser.Insert)
 
 			node3.Table = sqlparser.TableName{
-				Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", sqlparser.String(node3.Table), plan.RouteTableIndexList[i])),
+				Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", sqlparser.String(node3.Table.Name), plan.RouteTableIndexList[i])),
 				Qualifier: node.Table.Qualifier,
 			}
 			node3.Format(buf)
@@ -159,7 +159,7 @@ func (plan *Plan) GetIRKeyIndex(cols sqlparser.Columns) error {
 			break
 		}
 	}
-	if plan.KeyIndex == -1 {
+	if plan.KeyIndex == -1 && plan.Rule.Type != router.DefaultRuleType {
 		return my_errors.ErrIRNoShardingKey
 	}
 	return nil

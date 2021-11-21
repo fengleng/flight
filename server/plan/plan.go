@@ -2,7 +2,7 @@ package plan
 
 import (
 	"fmt"
-	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/router"
 	"github.com/fengleng/flight/server/schema"
@@ -67,16 +67,12 @@ func BuildPlan(statement sqlparser.Statement, schema *schema.Schema) (*Plan, err
 	switch stmt := statement.(type) {
 	case *sqlparser.Insert:
 		return buildInsertPlan(stmt, schema)
-	//case *sqlparser.Replace:
-	//	return r.buildReplacePlan(db, stmt)
 	case *sqlparser.Select:
 		return buildSelectPlan(stmt, schema)
 	case *sqlparser.Update:
 		return buildUpdatePlan(stmt, schema)
-		//case *sqlparser.Delete:
-		//	return r.buildDeletePlan(db, stmt)
-		//case *sqlparser.Truncate:
-		//	return r.buildTruncatePlan(db, stmt)
+	case *sqlparser.Delete:
+		return buildDeletePlan(stmt, schema)
 	}
 	return nil, my_errors.ErrNoPlan
 }
@@ -104,22 +100,10 @@ func buildSelectPlan(statement sqlparser.Statement, schema *schema.Schema) (*Pla
 	plan.Rule = schema.Router.GetRule(tableName, schema.DefaultNode) //根据表名获得分表规则
 
 	//DefaultRuleType 不分库分表==》defaultNode
-	if plan.Rule.Type != router.DefaultRuleType {
-		where = stmt.Where
-		if where != nil {
-			plan.Criteria = where.Expr //路由条件
-			err = plan.calRouteIndexList()
-			if err != nil {
-				Log.Error("BuildSelectPlan err:%v", err)
-				return nil, errors.Trace(err)
-			}
-		} else {
-			//if shard select without where,send to all nodes and all tables
-			plan.RouteTableIndexList = plan.Rule.SubTableIndexList
-			plan.RouteNodeIndexList = makeList(0, len(plan.Rule.NodeList))
-		}
-	} else {
-		plan.RouteNodeIndexList = []int{0}
+	plan.Criteria = where
+	if err = plan.calRouteIndexList(); err != nil {
+		log.Error("calRouteIndexList err:%v", err)
+		return nil, errors.Trace(err)
 	}
 	err = plan.generateSelectSql(stmt)
 	var fromSlave = true
@@ -230,7 +214,7 @@ func (plan *Plan) rewriteSelectSql(statement *sqlparser.Select, tableIndex int) 
 		switch v := expr.(type) {
 		case *sqlparser.StarExpr:
 			//for shardTable.*,need replace table into shardTable_xxxx.
-			if sqlparser.String(v.TableName) == plan.Rule.Table {
+			if sqlparser.String(v.TableName.Name) == plan.Rule.Table {
 				oldName := v.TableName
 				v.TableName = sqlparser.TableName{
 					Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", oldName.Name.String(), tableIndex)),
@@ -245,7 +229,7 @@ func (plan *Plan) rewriteSelectSql(statement *sqlparser.Select, tableIndex int) 
 						Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", oldQualifier.Name.String(), tableIndex)),
 						Qualifier: sqlparser.NewTableIdent(oldQualifier.Qualifier.String()),
 					}
-					colName.Format(buf)
+					//colName.Format(buf)
 				}
 			}
 		}
@@ -545,6 +529,21 @@ func (plan *Plan) notList(l []int) []int {
 //计算表下标和node下标
 func (plan *Plan) calRouteIndexList() error {
 	var err error
+	if plan.Rule.Type == router.DefaultRuleType {
+		nodeIndex, err := plan.Rule.FindNodeIndex(nil)
+		if err != nil {
+			return errors.Trace(err)
+		}
+		plan.RouteNodeIndexList = append(plan.RouteNodeIndexList, nodeIndex)
+		return nil
+	}
+	if plan.Criteria == nil {
+		//if shard select without where,send to all nodes and all tables
+		plan.RouteTableIndexList = plan.Rule.SubTableIndexList
+		plan.RouteNodeIndexList = makeList(0, len(plan.Rule.NodeList))
+		return nil
+	}
+
 	nodesCount := len(plan.Rule.NodeList)
 	switch criteria := plan.Criteria.(type) {
 	case sqlparser.Values: //代表insert中values
@@ -566,7 +565,7 @@ func (plan *Plan) calRouteIndexList() error {
 		return nil
 	default:
 		plan.RouteTableIndexList = plan.Rule.SubTableIndexList
-		plan.RouteTableIndexList = makeList(0, nodesCount)
+		plan.RouteNodeIndexList = makeList(0, nodesCount)
 		return nil
 	}
 }

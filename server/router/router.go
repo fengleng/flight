@@ -54,10 +54,15 @@ func (r *Router) GetRule(tableName string, defaultNode *config.NodeConfig) *Rule
 	}
 }
 
+func (r *Router) FindNodeIndex(rule *Rule, key interface{}) (int, error) {
+	return rule.FindNodeIndex(key)
+}
+
 func NewDefaultRule(node string) *Rule {
 	return &Rule{
 		Type:        DefaultRuleType,
 		NodeList:    []string{node},
+		DefaultNode: node,
 		Shard:       new(DefaultShard),
 		TableToNode: nil,
 	}
