@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/schema"
@@ -18,7 +19,7 @@ func buildDeletePlan(statement *sqlparser.Delete, schema *schema.Schema) (*Plan,
 	if len(stmt.TableExprs) == 1 {
 		tableNode, ok := stmt.TableExprs[0].(*sqlparser.AliasedTableExpr)
 		if ok {
-			tableNameNode, ok := tableNode.Expr.(*sqlparser.TableName)
+			tableNameNode, ok := tableNode.Expr.(sqlparser.TableName)
 			if ok {
 				tableName = sqlparser.String(tableNameNode.Name)
 			} else {
@@ -66,6 +67,9 @@ func (plan *Plan) generateDeleteSql(stmt *sqlparser.Delete) error {
 	} else {
 		tableCount := len(plan.RouteTableIndexList)
 		for i := 0; i < tableCount; i++ {
+			tableIndex := plan.RouteTableIndexList[i]
+			nodeIndex := plan.Rule.TableToNode[tableIndex]
+			nodeName := plan.Rule.NodeList[nodeIndex]
 			buf := sqlparser.NewTrackedBuffer(nil)
 			cloneBuf := sqlparser.NewTrackedBuffer(nil)
 			node.Format(cloneBuf)
@@ -77,20 +81,18 @@ func (plan *Plan) generateDeleteSql(stmt *sqlparser.Delete) error {
 
 			node2 := node1.(*sqlparser.Delete)
 			tableNode := node2.TableExprs[0].(*sqlparser.AliasedTableExpr)
-			tableNameNode := tableNode.Expr.(*sqlparser.TableName)
+			tableNameNode := tableNode.Expr.(sqlparser.TableName)
 
 			node2.TableExprs[0] = &sqlparser.AliasedTableExpr{
 				Expr: &sqlparser.TableName{
-					Name:      sqlparser.NewTableIdent(sqlparser.String(tableNameNode.Name)),
+					Name:      sqlparser.NewTableIdent(fmt.Sprintf("%s_%04d", sqlparser.String(tableNameNode.Name), tableIndex)),
 					Qualifier: sqlparser.NewTableIdent(sqlparser.String(tableNameNode.Qualifier)),
 				},
 				As:    tableNode.As,
 				Hints: tableNode.Hints,
 			}
 			node2.Format(buf)
-			tableIndex := plan.RouteTableIndexList[i]
-			nodeIndex := plan.Rule.TableToNode[tableIndex]
-			nodeName := plan.Rule.NodeList[nodeIndex]
+
 			if _, ok := sqlList[nodeName]; ok == false {
 				sqlList[nodeName] = make([]string, 0, tableCount)
 			}

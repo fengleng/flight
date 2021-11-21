@@ -88,7 +88,7 @@ func (plan *Plan) generateUpdateSql(stmt sqlparser.Statement) error {
 			if !ok {
 				return my_errors.ErrUpdateTooComplex
 			}
-			tableName, ok := TableExpr.Expr.(*sqlparser.TableName)
+			tableName, ok := TableExpr.Expr.(sqlparser.TableName)
 			if !ok {
 				return my_errors.ErrUpdateTooComplex
 			}
