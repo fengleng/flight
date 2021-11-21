@@ -4,8 +4,10 @@ import (
 	"fmt"
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server"
+	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/go-common/core/hack"
+	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
 	"net"
@@ -36,6 +38,8 @@ type ClientConn struct {
 
 	lastInsertId int64
 	affectedRows int64
+
+	txConns map[*backend_node.Node]*backend.Conn
 }
 
 var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
@@ -214,8 +218,8 @@ func (c *ClientConn) dispatch(data []byte) error {
 		return c.writeOK(nil)
 	case mysql.COM_INIT_DB:
 		return c.handleUseDB(hack.String(data))
-	//case mysql.COM_FIELD_LIST:
-	//	return c.handleFieldList(data)
+	case mysql.COM_FIELD_LIST:
+		return c.handleFieldList(data)
 	//case mysql.COM_STMT_PREPARE:
 	//	return c.handleStmtPrepare(hack.String(data))
 	//case mysql.COM_STMT_EXECUTE:

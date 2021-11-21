@@ -58,8 +58,8 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 		return c.handleExec(stmt, nil)
 	//case *sqlparser.Replace:
 	//	return c.handleExec(stmt, nil)
-	//case *sqlparser.Set:
-	//	return c.handleSet(v, sql)
+	case *sqlparser.Set:
+		return c.handleSet(v, sql)
 	//case *sqlparser.Begin:
 	//	return c.handleBegin()
 	//case *sqlparser.Commit:
