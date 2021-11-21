@@ -12,7 +12,6 @@ import (
 
 func buildUpdatePlan(statement sqlparser.Statement, schema *schema.Schema) (*Plan, error) {
 	plan := &Plan{}
-	var where *sqlparser.Where
 
 	stmt := statement.(*sqlparser.Update)
 	plan.Rule = schema.Router.GetRule(sqlparser.String(stmt.TableExprs), schema.DefaultNode)
@@ -20,7 +19,11 @@ func buildUpdatePlan(statement sqlparser.Statement, schema *schema.Schema) (*Pla
 		return nil, err
 	}
 
-	plan.Criteria = where
+	if stmt.Where != nil {
+		plan.Criteria = stmt.Where.Expr
+	} else {
+		plan.Criteria = nil
+	}
 	if err := plan.calRouteIndexList(); err != nil {
 		log.Error("calRouteIndexList err:%v", err)
 		return nil, errors.Trace(err)

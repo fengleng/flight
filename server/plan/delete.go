@@ -10,7 +10,6 @@ import (
 
 func buildDeletePlan(statement *sqlparser.Delete, schema *schema.Schema) (*Plan, error) {
 	plan := &Plan{}
-	var where *sqlparser.Where
 	var err error
 	var tableName string
 
@@ -35,7 +34,11 @@ func buildDeletePlan(statement *sqlparser.Delete, schema *schema.Schema) (*Plan,
 
 	plan.Rule = schema.Router.GetRule(tableName, schema.DefaultNode) //根据表名获得分表规则
 
-	plan.Criteria = where
+	if stmt.Where != nil {
+		plan.Criteria = stmt.Where.Expr
+	} else {
+		plan.Criteria = nil
+	}
 
 	if err = plan.calRouteIndexList(); err != nil {
 		log.Error("calRouteIndexList err:%v", err)
