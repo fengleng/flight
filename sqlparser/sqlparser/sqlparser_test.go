@@ -28,9 +28,10 @@ func TestSelectParsing(t *testing.T) {
 	//sta2, err := Parse(`select * from qrfm_daily_static left join clientlog_client_log_task cclt on qrfm_daily_static.app_id = cclt.app_id where qrfm_daily_static.id = cclt.id;`)
 	//sta3, err := Parse(`delete from tt where id = 9 ;`)
 	sta4, err := Parse("begin;")
+	sta5, err := Parse("select last_insert_id();")
 	//t.Log(sta)
 	//t.Log(sta2)
-	//t.Log(sta3)
+	t.Log(sta5)
 	t.Log(sta4.(*Begin).String())
 	checkErr(t, err)
 }

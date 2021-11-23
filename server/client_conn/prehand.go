@@ -122,10 +122,10 @@ func (c *ClientConn) preHandShow(sql string, tokens []string, tokenLen int) (r *
 			isHand = true
 			r, err = c.schema.DefaultBackendNode.Master.Execute("SHOW TABLES;")
 			return
+		} else {
+			err = my_errors.ErrCmdUnsupport
+			return
 		}
-	} else {
-		err = my_errors.ErrCmdUnsupport
-		return
 	}
 	return
 }

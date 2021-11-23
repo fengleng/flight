@@ -16,6 +16,15 @@ func (c *ClientConn) isAutoCommit() bool {
 }
 
 func (c *ClientConn) handleBegin() error {
+	c.txConns = make(map[*backend_node.Node]*backend.Conn, len(c.srv.BackEndNode))
+	//for _, node := range c.srv.BackEndNode {
+	//	conn, err := node.Master.GetConn()
+	//	if err != nil {
+	//		return errors.Trace(err)
+	//	}
+	//	c.txConns[node] = conn
+	//}
+
 	for _, co := range c.txConns {
 		if err := co.Begin(); err != nil {
 			return err

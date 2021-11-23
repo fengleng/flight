@@ -13,8 +13,6 @@ import (
 	"github.com/juju/errors"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -805,7 +803,102 @@ func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) er
 	return nil
 }
 
+func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*backend.Conn, error) {
+	var err error
+	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
+		return nil, my_errors.ErrNoRouteNode
+	}
+
+	nodesCount := len(exePlan.RouteNodeIndexList)
+	backendNodeMap := make(map[string]*backend_node.Node)
+
+	if c.isInTransaction() {
+		for i := 0; i < nodesCount; i++ {
+			nodeIndex := exePlan.RouteNodeIndexList[i]
+			if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
+				backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
+			} else {
+				backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
+			}
+		}
+	} else {
+		for i := 0; i < nodesCount; i++ {
+			nodeIndex := exePlan.RouteNodeIndexList[i]
+			if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
+				backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
+			} else {
+				backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
+			}
+		}
+	}
+	conns := make(map[string]*backend.Conn)
+	var co *backend.Conn
+	for name, n := range backendNodeMap {
+		co, err = c.getBackendConn(n, exePlan.FromSlave)
+		if err != nil {
+			break
+		}
+		conns[name] = co
+	}
+
+	return conns, err
+}
+
+func (c *ClientConn) getBackendConn(n *backend_node.Node, fromSlave bool) (co *backend.Conn, err error) {
+	if !c.isInTransaction() {
+		if fromSlave {
+			co, err = n.GetSlaveConn()
+			if err != nil {
+				co, err = n.GetMasterConn()
+			}
+		} else {
+			co, err = n.GetMasterConn()
+		}
+		if err != nil {
+			log.Error("server getBackendConn %v", err.Error())
+			return
+		}
+	} else {
+		var ok bool
+		co, ok = c.txConns[n]
+
+		if !ok {
+			if co, err = n.GetMasterConn(); err != nil {
+				return
+			}
+
+			if !c.isAutoCommit() {
+				if err = co.SetAutoCommit(0); err != nil {
+					return
+				}
+			} else {
+				if err = co.Begin(); err != nil {
+					return
+				}
+			}
+
+			c.txConns[n] = co
+		}
+	}
+
+	if err = co.UseDB(c.db); err != nil {
+		//reset the database to null
+		c.db = ""
+		return
+	}
+
+	if err = co.SetCharset(c.charset, c.collation); err != nil {
+		return
+	}
+
+	return
+}
+
 func (c *ClientConn) GetShardDb(exePlan *plan.Plan) (map[string]*backend.DB, error) {
+
+	if c.isInTransaction() {
+
+	}
 
 	var dbMap = make(map[string]*backend.DB)
 	nodesCount := len(exePlan.RouteNodeIndexList)
@@ -825,66 +918,4 @@ func (c *ClientConn) GetShardDb(exePlan *plan.Plan) (map[string]*backend.DB, err
 		dbMap[nodeName] = node.GetDb(exePlan.FromSlave)
 	}
 	return dbMap, nil
-}
-
-func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{}) ([]*mysql.Result, error) {
-	var err error
-	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
-		return nil, my_errors.ErrNoRouteNode
-	}
-
-	dbMap, err := c.GetShardDb(exePlan)
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(dbMap))
-
-	resultCount := 0
-	for _, sqlSlice := range exePlan.RewrittenSqlList {
-		resultCount += len(sqlSlice)
-	}
-
-	rs := make([]interface{}, resultCount)
-
-	f := func(rs []interface{}, i int, sqlList []string, co *backend.DB) {
-		var state string
-		for _, v := range sqlList {
-			startTime := time.Now().UnixNano()
-			r, err := co.Execute(v, args...)
-			if err != nil {
-				state = "ERROR"
-				rs[i] = err
-			} else {
-				state = "OK"
-				rs[i] = r
-			}
-			execTime := float64(time.Now().UnixNano()-startTime) / float64(time.Millisecond)
-			log.Info("%s %.1fms - %s->%s", state, execTime, c.c.RemoteAddr(), c.db)
-			i++
-		}
-		wg.Done()
-	}
-
-	offset := 0
-	for nodeName, db := range dbMap {
-		sqlList := exePlan.RewrittenSqlList[nodeName]
-		go f(rs, offset, sqlList, db)
-		offset += len(sqlList)
-	}
-	wg.Wait()
-
-	r := make([]*mysql.Result, resultCount)
-	for i, v := range rs {
-		if e, ok := v.(error); ok {
-			err = e
-			break
-		}
-		if rs[i] != nil {
-			r[i] = rs[i].(*mysql.Result)
-		}
-	}
-
-	return r, err
 }

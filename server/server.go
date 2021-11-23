@@ -20,6 +20,7 @@ type Server struct {
 
 	SchemaMap map[string]*schema.Schema
 
+	NodeMap     map[string]*config.NodeConfig
 	BackEndNode map[string]*backend_node.Node
 
 	CacheShaPassword *sync.Map // 'user@host' -> SHA256(SHA256(PASSWORD))
@@ -41,6 +42,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
+	if err := s.parseNodeList(cfg.NodeList); err != nil {
+		return nil, errors.Trace(err)
+	}
+
 	if err := s.parseSchemaList(cfg.SchemaList); err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -55,8 +60,24 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) parseNodeList(cfgList []config.NodeConfig) {
+func (s *Server) parseNodeList(cfgList []config.NodeConfig) error {
+	var err error
+	s.NodeMap = make(map[string]*config.NodeConfig)
+	for _, nodeCfg := range cfgList {
+		_, ok := s.NodeMap[nodeCfg.Name]
+		if ok {
+			err = errors.Errorf("duplicated node[%s]", nodeCfg.Name)
+			return err
+		}
+		s.NodeMap[nodeCfg.Name] = &nodeCfg
+	}
 
+	if backendMap, err := backend_node.ParseNodeList(cfgList, ""); err != nil {
+		return errors.Trace(err)
+	} else {
+		s.BackEndNode = backendMap
+	}
+	return nil
 }
 
 func (s *Server) parseSchemaList(cfgList []config.SchemaConfig) error {

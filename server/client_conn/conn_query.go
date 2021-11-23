@@ -3,10 +3,16 @@ package client_conn
 import (
 	"fmt"
 	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/flight/server/plan"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
+	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
+	"github.com/fengleng/log"
 	"github.com/pingcap/errors"
 	"strings"
+	"sync"
+	"time"
 )
 
 /*处理query语句*/
@@ -87,4 +93,84 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 	}
 
 	return nil
+}
+
+func (c *ClientConn) closeShardConns(conns map[string]*backend.Conn, rollback bool) {
+	if c.isInTransaction() {
+		return
+	}
+
+	for _, co := range conns {
+		if rollback {
+			err := co.Rollback()
+			if err != nil {
+				log.Error("%s rollback", err)
+			}
+		}
+		co.Close()
+	}
+}
+
+func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{}) ([]*mysql.Result, error) {
+	var err error
+	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
+		return nil, my_errors.ErrNoRouteNode
+	}
+
+	conns, err := c.getShardConns(exePlan)
+
+	defer c.closeShardConns(conns, err != nil && c.isInTransaction())
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(conns))
+
+	resultCount := 0
+	for _, sqlSlice := range exePlan.RewrittenSqlList {
+		resultCount += len(sqlSlice)
+	}
+
+	rs := make([]interface{}, resultCount)
+
+	f := func(rs []interface{}, i int, sqlList []string, co *backend.Conn) {
+		var state string
+		for _, v := range sqlList {
+			startTime := time.Now().UnixNano()
+			r, err := co.Execute(v, args...)
+			if err != nil {
+				state = "ERROR"
+				rs[i] = err
+			} else {
+				state = "OK"
+				rs[i] = r
+			}
+			execTime := float64(time.Now().UnixNano()-startTime) / float64(time.Millisecond)
+			log.Info("%s %.1fms - %s->%s", state, execTime, c.c.RemoteAddr(), c.db)
+			i++
+		}
+		wg.Done()
+	}
+
+	offset := 0
+	for nodeName, conn := range conns {
+		sqlList := exePlan.RewrittenSqlList[nodeName]
+		go f(rs, offset, sqlList, conn)
+		offset += len(sqlList)
+	}
+	wg.Wait()
+
+	r := make([]*mysql.Result, resultCount)
+	for i, v := range rs {
+		if e, ok := v.(error); ok {
+			err = e
+			break
+		}
+		if rs[i] != nil {
+			r[i] = rs[i].(*mysql.Result)
+		}
+	}
+
+	return r, err
 }

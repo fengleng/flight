@@ -7,11 +7,14 @@ import (
 	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
+	"sync"
 	"time"
 )
 
 type Node struct {
-	Master           *backend.DB
+	Master *backend.DB
+
+	sync.RWMutex
 	SlaveList        []*backend.DB
 	DownAfterNoAlive time.Duration
 
@@ -121,4 +124,35 @@ func (n *Node) Execute(command string, fromSlave bool, args ...interface{}) (*my
 	} else {
 		return n.Master.Execute(command, args...)
 	}
+}
+
+func (n *Node) String() string {
+	return n.Cfg.Name
+}
+
+func (n *Node) GetMasterConn() (*backend.Conn, error) {
+	db := n.Master
+	if db == nil {
+		return nil, my_errors.ErrNoMasterConn
+	}
+	if db.State() != "up" {
+		return nil, my_errors.ErrMasterDown
+	}
+
+	return db.GetConn()
+}
+
+func (n *Node) GetSlaveConn() (*backend.Conn, error) {
+	n.Lock()
+	db := n.SlaveList[0]
+	n.Unlock()
+
+	if db == nil {
+		return nil, my_errors.ErrNoSlaveDB
+	}
+	if db.State() != "up" {
+		return nil, my_errors.ErrMasterDown
+	}
+
+	return db.GetConn()
 }
