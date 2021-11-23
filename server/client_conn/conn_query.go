@@ -5,8 +5,8 @@ import (
 	. "github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/plan"
+	"github.com/fengleng/flight/server/wrap_conn"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
-	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/fengleng/log"
 	"github.com/pingcap/errors"
@@ -92,10 +92,10 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 		return fmt.Errorf("statement %T not support now", stmt)
 	}
 
-	return nil
+	//return nil
 }
 
-func (c *ClientConn) closeShardConns(conns map[string]*backend.Conn, rollback bool) {
+func (c *ClientConn) closeShardConns(conns map[string]*wrap_conn.Conn, rollback bool) {
 	if c.isInTransaction() {
 		return
 	}
@@ -107,7 +107,7 @@ func (c *ClientConn) closeShardConns(conns map[string]*backend.Conn, rollback bo
 				log.Error("%s rollback", err)
 			}
 		}
-		co.Close()
+		co.Db.PutConn(co.Conn)
 	}
 }
 
@@ -134,7 +134,7 @@ func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{})
 
 	rs := make([]interface{}, resultCount)
 
-	f := func(rs []interface{}, i int, sqlList []string, co *backend.Conn) {
+	f := func(rs []interface{}, i int, sqlList []string, co *wrap_conn.Conn) {
 		var state string
 		for _, v := range sqlList {
 			startTime := time.Now().UnixNano()

@@ -5,6 +5,7 @@ import (
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/plan"
+	"github.com/fengleng/flight/server/wrap_conn"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/util/hack"
 	"github.com/fengleng/go-mysql-client/backend"
@@ -803,7 +804,7 @@ func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) er
 	return nil
 }
 
-func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*backend.Conn, error) {
+func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*wrap_conn.Conn, error) {
 	var err error
 	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
 		return nil, my_errors.ErrNoRouteNode
@@ -831,8 +832,8 @@ func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*backend.Conn
 			}
 		}
 	}
-	conns := make(map[string]*backend.Conn)
-	var co *backend.Conn
+	conns := make(map[string]*wrap_conn.Conn)
+	var co *wrap_conn.Conn
 	for name, n := range backendNodeMap {
 		co, err = c.getBackendConn(n, exePlan.FromSlave)
 		if err != nil {
@@ -844,53 +845,70 @@ func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*backend.Conn
 	return conns, err
 }
 
-func (c *ClientConn) getBackendConn(n *backend_node.Node, fromSlave bool) (co *backend.Conn, err error) {
+func (c *ClientConn) getBackendConn(n *backend_node.Node, fromSlave bool) (wc *wrap_conn.Conn, err error) {
+	var db *backend.DB
 	if !c.isInTransaction() {
 		if fromSlave {
-			co, err = n.GetSlaveConn()
+			db, err = n.GetSlaveConn()
 			if err != nil {
-				co, err = n.GetMasterConn()
+				db, err = n.GetMasterDb()
 			}
 		} else {
-			co, err = n.GetMasterConn()
+			db, err = n.GetMasterDb()
 		}
 		if err != nil {
 			log.Error("server getBackendConn %v", err.Error())
 			return
 		}
+		conn, err := db.GetConn()
+		if err != nil {
+			log.Error("server getBackendConn %v", err.Error())
+			return
+		}
+		wc = &wrap_conn.Conn{
+			Conn: conn,
+			Db:   db,
+		}
 	} else {
 		var ok bool
-		co, ok = c.txConns[n]
+		wc, ok = c.txConns[n]
 
 		if !ok {
-			if co, err = n.GetMasterConn(); err != nil {
+			if db, err = n.GetMasterDb(); err != nil {
 				return
 			}
-
+			conn, err := db.GetConn()
+			if err != nil {
+				log.Error("server getBackendConn %v", err.Error())
+				return
+			}
+			wc = &wrap_conn.Conn{
+				Conn: conn,
+				Db:   db,
+			}
 			if !c.isAutoCommit() {
-				if err = co.SetAutoCommit(0); err != nil {
+				if err = wc.SetAutoCommit(0); err != nil {
 					return
 				}
 			} else {
-				if err = co.Begin(); err != nil {
+				if err = wc.Begin(); err != nil {
 					return
 				}
 			}
 
-			c.txConns[n] = co
+			c.txConns[n] = wc
 		}
 	}
 
-	if err = co.UseDB(c.db); err != nil {
+	if err = wc.UseDB(c.db); err != nil {
 		//reset the database to null
 		c.db = ""
 		return
 	}
 
-	if err = co.SetCharset(c.charset, c.collation); err != nil {
+	if err = wc.SetCharset(c.charset, c.collation); err != nil {
 		return
 	}
-
 	return
 }
 

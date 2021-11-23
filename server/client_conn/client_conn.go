@@ -6,8 +6,8 @@ import (
 	"github.com/fengleng/flight/server"
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/schema"
+	"github.com/fengleng/flight/server/wrap_conn"
 	"github.com/fengleng/go-common/core/hack"
-	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
 	"net"
@@ -39,7 +39,7 @@ type ClientConn struct {
 	lastInsertId int64
 	affectedRows int64
 
-	txConns map[*backend_node.Node]*backend.Conn
+	txConns map[*backend_node.Node]*wrap_conn.Conn
 }
 
 var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |

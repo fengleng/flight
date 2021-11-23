@@ -130,7 +130,7 @@ func (n *Node) String() string {
 	return n.Cfg.Name
 }
 
-func (n *Node) GetMasterConn() (*backend.Conn, error) {
+func (n *Node) GetMasterDb() (*backend.DB, error) {
 	db := n.Master
 	if db == nil {
 		return nil, my_errors.ErrNoMasterConn
@@ -139,10 +139,10 @@ func (n *Node) GetMasterConn() (*backend.Conn, error) {
 		return nil, my_errors.ErrMasterDown
 	}
 
-	return db.GetConn()
+	return db, nil
 }
 
-func (n *Node) GetSlaveConn() (*backend.Conn, error) {
+func (n *Node) GetSlaveConn() (*backend.DB, error) {
 	n.Lock()
 	db := n.SlaveList[0]
 	n.Unlock()
@@ -154,5 +154,5 @@ func (n *Node) GetSlaveConn() (*backend.Conn, error) {
 		return nil, my_errors.ErrMasterDown
 	}
 
-	return db.GetConn()
+	return db, nil
 }
