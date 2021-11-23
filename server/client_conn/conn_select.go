@@ -860,7 +860,8 @@ func (c *ClientConn) getBackendConn(n *backend_node.Node, fromSlave bool) (wc *w
 			log.Error("server getBackendConn %v", err.Error())
 			return
 		}
-		conn, err := db.GetConn()
+		var conn *backend.Conn
+		conn, err = db.GetConn()
 		if err != nil {
 			log.Error("server getBackendConn %v", err.Error())
 			return
@@ -877,7 +878,8 @@ func (c *ClientConn) getBackendConn(n *backend_node.Node, fromSlave bool) (wc *w
 			if db, err = n.GetMasterDb(); err != nil {
 				return
 			}
-			conn, err := db.GetConn()
+			var conn *backend.Conn
+			conn, err = db.GetConn()
 			if err != nil {
 				log.Error("server getBackendConn %v", err.Error())
 				return

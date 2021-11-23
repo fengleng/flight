@@ -5,8 +5,8 @@ import (
 	"github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/flight/server/wrap_conn"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
-	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"strings"
 	"time"
@@ -73,12 +73,12 @@ func (c *ClientConn) handleSetAutoCommit(expr sqlparser.Expr) error {
 		for _, co := range c.txConns {
 			if e := co.SetAutoCommit(1); e != nil {
 				co.Close()
-				c.txConns = make(map[*backend_node.Node]*backend.Conn)
+				c.txConns = make(map[*backend_node.Node]*wrap_conn.Conn)
 				return fmt.Errorf("set autocommit error, %v", e)
 			}
 			co.Close()
 		}
-		c.txConns = make(map[*backend_node.Node]*backend.Conn)
+		c.txConns = make(map[*backend_node.Node]*wrap_conn.Conn)
 	case `0`, `OFF`:
 		c.status &= ^mysql.SERVER_STATUS_AUTOCOMMIT
 	default:
