@@ -312,6 +312,13 @@ var keywords = map[string]int{
 	"xor":                 UNUSED,
 	"year_month":          UNUSED,
 	"zerofill":            UNUSED,
+
+	//事务
+	"begin":       BEGIN,
+	"rollback":    ROLLBACK,
+	"commit":      COMMIT,
+	"start":       START,
+	"transaction": TRANSACTION,
 }
 
 // Lex returns the next token form the Tokenizer.

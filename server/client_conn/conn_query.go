@@ -60,12 +60,12 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 	//	return c.handleExec(stmt, nil)
 	case *sqlparser.Set:
 		return c.handleSet(v, sql)
-	//case *sqlparser.Begin:
-	//	return c.handleBegin()
-	//case *sqlparser.Commit:
-	//	return c.handleCommit()
-	//case *sqlparser.Rollback:
-	//	return c.handleRollback()
+	case *sqlparser.Begin:
+		return c.handleBegin()
+	case *sqlparser.Commit:
+		return c.handleCommit()
+	case *sqlparser.Rollback:
+		return c.handleRollback()
 	//case *sqlparser.Admin:
 	//	if c.user == "root" {
 	//		return c.handleAdmin(v)

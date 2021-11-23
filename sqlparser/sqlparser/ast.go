@@ -149,9 +149,6 @@ func (*OtherRead) iStatement()     {}
 func (*OtherAdmin) iStatement()    {}
 func (*TruncateTable) iStatement() {}
 
-
-
-
 // ParenSelect can actually not be a top level statement,
 // but we have to allow it because it's a requirement
 // of SelectStatement.
@@ -784,38 +781,50 @@ func (node *TruncateTable) WalkSubtree(visit Visit) error {
 	)
 }
 
-func (*Begin) iStatement() {}
-func (*Commit) iStatement() {}
+func (*Begin) iStatement()    {}
+func (*Commit) iStatement()   {}
 func (*Rollback) iStatement() {}
 
-type Begin struct {}
+type Begin struct{}
 
 func (b *Begin) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%s","begin")
+	buf.Myprintf("%s", "begin")
 }
 
 func (b *Begin) WalkSubtree(visit Visit) error {
 	return nil
 }
 
-type Commit struct {}
+func (b *Begin) String() string {
+	return String(b)
+}
+
+type Commit struct{}
 
 func (c *Commit) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%s","commit")
+	buf.Myprintf("%s", "commit")
 }
 
 func (c *Commit) WalkSubtree(visit Visit) error {
 	return nil
 }
 
-type Rollback struct {}
-
-func ( *Rollback) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%s","rollback")
+func (c *Commit) String() string {
+	return String(c)
 }
 
-func ( *Rollback) WalkSubtree(visit Visit) error {
+type Rollback struct{}
+
+func (r *Rollback) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%s", "rollback")
+}
+
+func (r *Rollback) WalkSubtree(visit Visit) error {
 	return nil
+}
+
+func (r *Rollback) String() string {
+	return String(r)
 }
 
 // Format formats the node.

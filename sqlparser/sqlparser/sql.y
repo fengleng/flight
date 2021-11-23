@@ -143,6 +143,9 @@ func forceEOF(yylex interface{}) {
 // Match
 %token <bytes> MATCH AGAINST BOOLEAN LANGUAGE WITH QUERY EXPANSION
 
+// Transaction Tokens
+%token <empty> BEGIN START TRANSACTION COMMIT ROLLBACK
+
 // MySQL reserved words that are unused by this grammar will map to this token.
 %token <bytes> UNUSED
 
@@ -151,6 +154,7 @@ func forceEOF(yylex interface{}) {
 %type <statement> insert_statement update_statement delete_statement set_statement
 %type <statement> create_statement alter_statement rename_statement drop_statement
 %type <statement> analyze_statement show_statement use_statement other_statement
+%type <statement> begin_statement commit_statement rollback_statement
 %type <bytes2> comment_opt comment_list
 %type <str> union_op insert_or_replace
 %type <str> distinct_opt straight_join_opt cache_opt match_option separator_opt
@@ -238,6 +242,9 @@ command:
 | show_statement
 | use_statement
 | other_statement
+| begin_statement
+| commit_statement
+| rollback_statement
 
 select_statement:
   base_select order_by_opt limit_opt lock_opt
@@ -483,6 +490,28 @@ other_statement:
 | TRUNCATE force_eof
   {
     $$ = &OtherAdmin{}
+  }
+
+begin_statement:
+  BEGIN
+  {
+    $$ = &Begin{}
+  }
+| START TRANSACTION
+  {
+    $$ = &Begin{}
+  }
+
+commit_statement:
+  COMMIT
+  {
+    $$ = &Commit{}
+  }
+
+rollback_statement:
+  ROLLBACK
+  {
+    $$ = &Rollback{}
   }
 
 comment_opt:
