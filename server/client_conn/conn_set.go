@@ -12,11 +12,9 @@ import (
 	"time"
 )
 
-var nstring = sqlparser.String
-
 func (c *ClientConn) handleSet(stmt *sqlparser.Set, sql string) (err error) {
 	if len(stmt.Exprs) != 1 && len(stmt.Exprs) != 2 {
-		return fmt.Errorf("must set one item once, not %s", nstring(stmt))
+		return fmt.Errorf("must set one item once, not %s", sqlparser.String(stmt))
 	}
 
 	//log the SQL

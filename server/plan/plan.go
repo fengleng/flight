@@ -295,23 +295,6 @@ func (plan *Plan) getRangeShardTableIndex(expr sqlparser.Expr) ([]int, error) {
 	return plan.RouteTableIndexList, nil
 }
 
-//func (plan *Plan) adjustShardIndex(valExpr sqlparser.Expr, index int) int {
-//	value := plan.getBoundValue(valExpr)
-//	//生成一个范围的接口,[100,120)
-//	s, ok := plan.Rule.Shard.(RangeShard)
-//	if !ok {
-//		return index
-//	}
-//	//value是否和shard[index].Start相等
-//	if s.EqualStart(value, index) {
-//		index--
-//		if index < 0 {
-//			panic(sqlparser.NewParserError("invalid range sharding"))
-//		}
-//	}
-//	return index
-//}
-
 //Get the table index of date shard type(date_year,date_month,date_day).
 func (plan *Plan) getDateShardTableIndex(expr sqlparser.Expr) ([]int, error) {
 	var index int
