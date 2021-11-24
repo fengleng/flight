@@ -95,6 +95,13 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 	//return nil
 }
 
+func (c *ClientConn) closeShardConn(co *wrap_conn.Conn, rollback bool) {
+	if c.isInTransaction() {
+		return
+	}
+	co.Db.PutConn(co.Conn)
+}
+
 func (c *ClientConn) closeShardConns(conns map[string]*wrap_conn.Conn, rollback bool) {
 	if c.isInTransaction() {
 		return

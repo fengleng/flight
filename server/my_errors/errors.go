@@ -58,5 +58,6 @@ var (
 	ErrUpdateTooComplex = errors.NewNoStackError("update is too complex")
 	ErrSQLNULL          = errors.NewNoStackError("sql is null")
 
-	ErrInternalServer = errors.NewNoStackError("internal server error")
+	ErrInternalServer      = errors.NewNoStackError("internal server error")
+	ErrDefaultNodeNotExist = errors.NewNoStackError("default node not exist")
 )
