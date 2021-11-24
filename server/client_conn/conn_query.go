@@ -99,6 +99,12 @@ func (c *ClientConn) closeShardConn(co *wrap_conn.Conn, rollback bool) {
 	if c.isInTransaction() {
 		return
 	}
+	if rollback {
+		err := co.Rollback()
+		if err != nil {
+			log.Error("%s rollback", err)
+		}
+	}
 	co.Db.PutConn(co.Conn)
 }
 
