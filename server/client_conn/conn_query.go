@@ -187,3 +187,22 @@ func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{})
 
 	return r, err
 }
+
+func (c *ClientConn) executeInNode(conn *wrap_conn.Conn, sql string, args []interface{}) ([]*mysql.Result, error) {
+	var state string
+	startTime := time.Now().UnixNano()
+	r, err := conn.Execute(sql, args...)
+	if err != nil {
+		state = "ERROR"
+	} else {
+		state = "OK"
+	}
+	execTime := float64(time.Now().UnixNano()-startTime) / float64(time.Millisecond)
+	log.Info("%s %.1fms - %s->%s", state, execTime, c.c.RemoteAddr(), c.db)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return []*mysql.Result{r}, err
+}

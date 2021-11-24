@@ -2,12 +2,15 @@ package client_conn
 
 import (
 	"fmt"
-	. "github.com/fengleng/flight/log"
+	"github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server"
 	"github.com/fengleng/flight/server/backend_node"
+	"github.com/fengleng/flight/server/my_errors"
+	"github.com/fengleng/flight/server/plan"
 	"github.com/fengleng/flight/server/schema"
 	"github.com/fengleng/flight/server/wrap_conn"
 	"github.com/fengleng/go-common/core/hack"
+	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
 	"github.com/pingcap/errors"
 	"net"
@@ -40,6 +43,10 @@ type ClientConn struct {
 	affectedRows int64
 
 	txConns map[*backend_node.Node]*wrap_conn.Conn
+
+	stmtId uint32
+
+	stmts map[uint32]*Stmt //prepare相关,client端到proxy的stmt
 }
 
 var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
@@ -73,8 +80,8 @@ func NewClientConn(co net.Conn, s *server.Server) *ClientConn {
 	c.charset = mysql.DEFAULT_CHARSET
 	c.collation = mysql.DEFAULT_COLLATION_ID
 
-	//c.stmtId = 0
-	//c.stmts = make(map[uint32]*Stmt)
+	c.stmtId = 0
+	c.stmts = make(map[uint32]*Stmt)
 	c.srv = s
 
 	return c
@@ -165,13 +172,13 @@ func (c *ClientConn) Run() {
 	defer func() {
 		r := recover()
 		if err, ok := r.(error); ok {
-			Log.Error("%v", errors.AddStack(err))
+			log.Error("%v", errors.AddStack(err))
 		}
 		_ = c.Close()
 	}()
 	defer c.clean()
 	if err := c.Handshake(); err != nil {
-		Log.Error("err:%v", err)
+		log.Error("err:%v", err)
 		_ = c.writeError(mysql.NewDefaultError(mysql.ER_DBACCESS_DENIED_ERROR, c.user, c.db))
 		return
 	}
@@ -182,11 +189,11 @@ func (c *ClientConn) Run() {
 
 	for {
 		if data, err := c.readPacket(); err != nil {
-			Log.Error("%v", errors.AddStack(err))
+			log.Error("%v", errors.AddStack(err))
 			return
 		} else {
 			if err := c.dispatch(data); err != nil {
-				Log.Error("ClientConn Run %v, %d", err, c.connectionId)
+				log.Error("ClientConn Run %v, %d", err, c.connectionId)
 				_ = c.writeError(err)
 				if err == mysql.ErrBadConn {
 					_ = c.Close()
@@ -220,21 +227,21 @@ func (c *ClientConn) dispatch(data []byte) error {
 		return c.handleUseDB(hack.String(data))
 	case mysql.COM_FIELD_LIST:
 		return c.handleFieldList(data)
-	//case mysql.COM_STMT_PREPARE:
-	//	return c.handleStmtPrepare(hack.String(data))
-	//case mysql.COM_STMT_EXECUTE:
-	//	return c.handleStmtExecute(data)
-	//case mysql.COM_STMT_CLOSE:
-	//	return c.handleStmtClose(data)
-	//case mysql.COM_STMT_SEND_LONG_DATA:
-	//	return c.handleStmtSendLongData(data)
-	//case mysql.COM_STMT_RESET:
-	//	return c.handleStmtReset(data)
-	//case mysql.COM_SET_OPTION:
-	//	return c.writeEOF(0)
+	case mysql.COM_STMT_PREPARE:
+		return c.handleStmtPrepare(hack.String(data))
+	case mysql.COM_STMT_EXECUTE:
+		return c.handleStmtExecute(data)
+	case mysql.COM_STMT_CLOSE:
+		return c.handleStmtClose(data)
+	case mysql.COM_STMT_SEND_LONG_DATA:
+		return c.handleStmtSendLongData(data)
+	case mysql.COM_STMT_RESET:
+		return c.handleStmtReset(data)
+	case mysql.COM_SET_OPTION:
+		return c.writeEOF(0)
 	default:
 		msg := fmt.Sprintf("command %d not supported now", cmd)
-		Log.Error(msg)
+		log.Error(msg)
 		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, msg)
 	}
 
@@ -300,4 +307,114 @@ func (c *ClientConn) writeResultset(status uint16, r *mysql.Resultset) error {
 	}
 
 	return nil
+}
+
+func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*wrap_conn.Conn, error) {
+	var err error
+	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
+		return nil, my_errors.ErrNoRouteNode
+	}
+
+	nodesCount := len(exePlan.RouteNodeIndexList)
+	backendNodeMap := make(map[string]*backend_node.Node)
+
+	if c.isInTransaction() {
+		for i := 0; i < nodesCount; i++ {
+			nodeIndex := exePlan.RouteNodeIndexList[i]
+			if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
+				backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
+			} else {
+				backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
+			}
+		}
+	} else {
+		for i := 0; i < nodesCount; i++ {
+			nodeIndex := exePlan.RouteNodeIndexList[i]
+			if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
+				backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
+			} else {
+				backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
+			}
+		}
+	}
+	conns := make(map[string]*wrap_conn.Conn)
+	var co *wrap_conn.Conn
+	for name, n := range backendNodeMap {
+		co, err = c.getWrapConn(n, exePlan.FromSlave)
+		if err != nil {
+			break
+		}
+		conns[name] = co
+	}
+
+	return conns, err
+}
+
+func (c *ClientConn) getWrapConn(n *backend_node.Node, fromSlave bool) (wc *wrap_conn.Conn, err error) {
+	var db *backend.DB
+	if !c.isInTransaction() {
+		if fromSlave {
+			db, err = n.GetSlaveConn()
+			if err != nil {
+				db, err = n.GetMasterDb()
+			}
+		} else {
+			db, err = n.GetMasterDb()
+		}
+		if err != nil {
+			log.Error("server getWrapConn %v", err.Error())
+			return
+		}
+		var conn *backend.Conn
+		conn, err = db.GetConn()
+		if err != nil {
+			log.Error("server getWrapConn %v", err.Error())
+			return
+		}
+		wc = &wrap_conn.Conn{
+			Conn: conn,
+			Db:   db,
+		}
+	} else {
+		var ok bool
+		wc, ok = c.txConns[n]
+
+		if !ok {
+			if db, err = n.GetMasterDb(); err != nil {
+				return
+			}
+			var conn *backend.Conn
+			conn, err = db.GetConn()
+			if err != nil {
+				log.Error("server getWrapConn %v", err.Error())
+				return
+			}
+			wc = &wrap_conn.Conn{
+				Conn: conn,
+				Db:   db,
+			}
+			if !c.isAutoCommit() {
+				if err = wc.SetAutoCommit(0); err != nil {
+					return
+				}
+			} else {
+				if err = wc.Begin(); err != nil {
+					return
+				}
+			}
+
+			c.txConns[n] = wc
+		}
+	}
+
+	if err = wc.UseDB(c.db); err != nil {
+		//reset the database to null
+		c.db = ""
+		return
+	}
+
+	if err = wc.SetCharset(c.charset, c.collation); err != nil {
+		return
+	}
+	return
 }

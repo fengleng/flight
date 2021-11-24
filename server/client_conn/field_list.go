@@ -24,7 +24,7 @@ func (c *ClientConn) handleFieldList(data []byte) error {
 	if !ok {
 		return my_errors.ErrDefaultNodeNotExist
 	}
-	wc, err := c.getBackendConn(node, true)
+	wc, err := c.getWrapConn(node, true)
 	defer c.closeShardConn(wc, err != nil && c.isInTransaction())
 	if err != nil {
 		log.Error("err:%v", err)

@@ -2,16 +2,15 @@ package client_conn
 
 import (
 	"fmt"
+	"github.com/fengleng/flight/log"
 	"github.com/fengleng/flight/server/backend_node"
 	"github.com/fengleng/flight/server/my_errors"
 	"github.com/fengleng/flight/server/plan"
-	"github.com/fengleng/flight/server/wrap_conn"
 	"github.com/fengleng/flight/sqlparser/sqlparser"
 	"github.com/fengleng/flight/sqlparser/tidbparser/dependency/util/hack"
 	"github.com/fengleng/go-mysql-client/backend"
 	"github.com/fengleng/go-mysql-client/mysql"
-	"github.com/fengleng/log"
-	"github.com/juju/errors"
+	"github.com/pingcap/errors"
 	"strconv"
 	"strings"
 )
@@ -32,6 +31,26 @@ var funcNameMap = map[string]int{
 	"max":            FUNC_EXIST,
 	"min":            FUNC_EXIST,
 	"last_insert_id": FUNC_EXIST,
+}
+
+func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) error {
+	exePlan, err := plan.BuildPlan(stmt, c.schema)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	var rs []*mysql.Result
+	rs, err = c.executeInMultiNodes(exePlan, args)
+	if err != nil {
+		log.Info("handleSelect executeInMultiNodes %v connectId: %d", err, c.connectionId)
+		return errors.Trace(err)
+	}
+	err = c.mergeSelectResult(rs, stmt)
+	if err != nil {
+		log.Info("handleSelect mergeSelectResult %v connectId: %d", err, c.connectionId)
+		return errors.Trace(err)
+	}
+	return nil
 }
 
 func (c *ClientConn) mergeSelectResult(rs []*mysql.Result, stmt *sqlparser.Select) error {
@@ -731,136 +750,6 @@ func (c *ClientConn) loadResultWithFuncIntoMap(rs []*mysql.Result,
 	}
 
 	return resultMap, nil
-}
-
-func (c *ClientConn) handleSelect(stmt *sqlparser.Select, args []interface{}) error {
-	exePlan, err := plan.BuildPlan(stmt, c.schema)
-	if err != nil {
-		return errors.Trace(err)
-	}
-
-	var rs []*mysql.Result
-	rs, err = c.executeInMultiNodes(exePlan, args)
-	if err != nil {
-		log.Info("handleSelect executeInMultiNodes %v connectId: %d", err, c.connectionId)
-		return errors.Trace(err)
-	}
-	err = c.mergeSelectResult(rs, stmt)
-	if err != nil {
-		log.Info("handleSelect mergeSelectResult %v connectId: %d", err, c.connectionId)
-		return errors.Trace(err)
-	}
-	return nil
-}
-
-func (c *ClientConn) getShardConns(exePlan *plan.Plan) (map[string]*wrap_conn.Conn, error) {
-	var err error
-	if exePlan == nil || len(exePlan.RouteNodeIndexList) == 0 {
-		return nil, my_errors.ErrNoRouteNode
-	}
-
-	nodesCount := len(exePlan.RouteNodeIndexList)
-	backendNodeMap := make(map[string]*backend_node.Node)
-
-	if c.isInTransaction() {
-		for i := 0; i < nodesCount; i++ {
-			nodeIndex := exePlan.RouteNodeIndexList[i]
-			if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
-				backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
-			} else {
-				backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
-			}
-		}
-	} else {
-		for i := 0; i < nodesCount; i++ {
-			nodeIndex := exePlan.RouteNodeIndexList[i]
-			if backendNode, ok := c.schema.BackendNode[exePlan.Rule.NodeList[nodeIndex]]; !ok {
-				backendNodeMap[c.schema.DefaultNode.Name] = c.schema.DefaultBackendNode
-			} else {
-				backendNodeMap[exePlan.Rule.NodeList[nodeIndex]] = backendNode
-			}
-		}
-	}
-	conns := make(map[string]*wrap_conn.Conn)
-	var co *wrap_conn.Conn
-	for name, n := range backendNodeMap {
-		co, err = c.getBackendConn(n, exePlan.FromSlave)
-		if err != nil {
-			break
-		}
-		conns[name] = co
-	}
-
-	return conns, err
-}
-
-func (c *ClientConn) getBackendConn(n *backend_node.Node, fromSlave bool) (wc *wrap_conn.Conn, err error) {
-	var db *backend.DB
-	if !c.isInTransaction() {
-		if fromSlave {
-			db, err = n.GetSlaveConn()
-			if err != nil {
-				db, err = n.GetMasterDb()
-			}
-		} else {
-			db, err = n.GetMasterDb()
-		}
-		if err != nil {
-			log.Error("server getBackendConn %v", err.Error())
-			return
-		}
-		var conn *backend.Conn
-		conn, err = db.GetConn()
-		if err != nil {
-			log.Error("server getBackendConn %v", err.Error())
-			return
-		}
-		wc = &wrap_conn.Conn{
-			Conn: conn,
-			Db:   db,
-		}
-	} else {
-		var ok bool
-		wc, ok = c.txConns[n]
-
-		if !ok {
-			if db, err = n.GetMasterDb(); err != nil {
-				return
-			}
-			var conn *backend.Conn
-			conn, err = db.GetConn()
-			if err != nil {
-				log.Error("server getBackendConn %v", err.Error())
-				return
-			}
-			wc = &wrap_conn.Conn{
-				Conn: conn,
-				Db:   db,
-			}
-			if !c.isAutoCommit() {
-				if err = wc.SetAutoCommit(0); err != nil {
-					return
-				}
-			} else {
-				if err = wc.Begin(); err != nil {
-					return
-				}
-			}
-
-			c.txConns[n] = wc
-		}
-	}
-
-	if err = wc.UseDB(c.db); err != nil {
-		//reset the database to null
-		c.db = ""
-		return
-	}
-
-	if err = wc.SetCharset(c.charset, c.collation); err != nil {
-		return
-	}
-	return
 }
 
 func (c *ClientConn) GetShardDb(exePlan *plan.Plan) (map[string]*backend.DB, error) {
