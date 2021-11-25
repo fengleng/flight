@@ -16,9 +16,7 @@ func (c *ClientConn) handleSet(stmt *sqlparser.Set, sql string) (err error) {
 	if len(stmt.Exprs) != 1 && len(stmt.Exprs) != 2 {
 		return fmt.Errorf("must set one item once, not %s", sqlparser.String(stmt))
 	}
-
-	//log the SQL
-	startTime := time.Now().UnixNano()
+	startTime := time.Now()
 	defer func() {
 		var state string
 		if err != nil {
@@ -26,7 +24,7 @@ func (c *ClientConn) handleSet(stmt *sqlparser.Set, sql string) (err error) {
 		} else {
 			state = "OK"
 		}
-		execTime := float64(time.Now().UnixNano()-startTime) / float64(time.Millisecond)
+		execTime := float64(time.Since(startTime).Microseconds()) / float64(1000)
 		log.Info("%s %.1fms - %s->%s", state, execTime, c.c.RemoteAddr(), c.db)
 
 	}()

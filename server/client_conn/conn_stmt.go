@@ -356,7 +356,7 @@ func (c *ClientConn) bindStmtArgs(s *Stmt, nullBitmap, paramTypes, paramValues [
 			if isUnsigned {
 				args[i] = uint16(binary.LittleEndian.Uint16(paramValues[pos : pos+2]))
 			} else {
-				args[i] = int16((binary.LittleEndian.Uint16(paramValues[pos : pos+2])))
+				args[i] = int16(binary.LittleEndian.Uint16(paramValues[pos : pos+2]))
 			}
 			pos += 2
 			continue
@@ -392,7 +392,7 @@ func (c *ClientConn) bindStmtArgs(s *Stmt, nullBitmap, paramTypes, paramValues [
 				return mysql.ErrMalformPacket
 			}
 
-			args[i] = float32(math.Float32frombits(binary.LittleEndian.Uint32(paramValues[pos : pos+4])))
+			args[i] = math.Float32frombits(binary.LittleEndian.Uint32(paramValues[pos : pos+4]))
 			pos += 4
 			continue
 

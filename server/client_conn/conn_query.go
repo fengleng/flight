@@ -150,7 +150,7 @@ func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{})
 	f := func(rs []interface{}, i int, sqlList []string, co *wrap_conn.Conn) {
 		var state string
 		for _, v := range sqlList {
-			startTime := time.Now().UnixNano()
+			startTime := time.Now()
 			r, err := co.Execute(v, args...)
 			if err != nil {
 				state = "ERROR"
@@ -159,7 +159,7 @@ func (c *ClientConn) executeInMultiNodes(exePlan *plan.Plan, args []interface{})
 				state = "OK"
 				rs[i] = r
 			}
-			execTime := float64(time.Now().UnixNano()-startTime) / float64(time.Millisecond)
+			execTime := float64(time.Since(startTime).Microseconds()) / float64(1000)
 			log.Info("%s %.1fms - %s->%s", state, execTime, c.c.RemoteAddr(), c.db)
 			i++
 		}
