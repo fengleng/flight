@@ -1,6 +1,7 @@
 package sqlparser
 
 import (
+	bytes2 "bytes"
 	"reflect"
 	"testing"
 )
@@ -23,20 +24,71 @@ func TestDropTableParsing(t *testing.T) {
 	checkErr(t, err)
 }
 
+func TestBacktick(t *testing.T) {
+	t.Log(Backtick("gg\\'g"))
+	t.Log(uint32('`'))
+}
+
 func TestSelectParsing(t *testing.T) {
 	//sta, err := Parse(`SELECT *,count(id) from users where id = 1 order by created_at limit 1 offset 3`)
-	//sta2, err := Parse(`select * from qrfm_daily_static left join clientlog_client_log_task cclt on qrfm_daily_static.app_id = cclt.app_id where qrfm_daily_static.id = cclt.id;`)
+	sta2, err := Parse(`select /*gsdfgdfg*/ * from qrfm_daily_static left join clientlog_client_log_task cclt on qrfm_daily_static.app_id = cclt.app_id where qrfm_daily_static.id = cclt.id;`)
 	//sta3, err := Parse(`delete from tt where id = 9 ;`)
-	sta4, err := Parse("INSERT INTO a SELECT * FROM b JOIN c ON b.i = c.i")
+	sta4, err := Parse("create  database if not exists tt /*gsdfgdfg*/ /*tt:cc */ default character set = 'utfmb4' default collate 'utfmb4_genci';")
 	sta5, err := Parse("insert /*tt:cc */ /*gg:vv*/ into  flight_table1(id, name, age) values (2,'ts2',25);")
 	//t.Log(sta)
 	//t.Log(sta2)
+	v := sta4.(*DbDDL)
+
+	c := v.Comments
+	for _, bytes := range c {
+		//var lastByte byte = 0
+		//trimFunc := strings.TrimFunc(string(bytes), func(r rune) bool {
+		//	if (lastByte=='/'&&r=='*') || lastByte=='*'&&r=='/'{
+		//
+		//	}
+		//})
+		var newBytes bytes2.Buffer
+		for i := 0; i < len(bytes); i++ {
+			b := bytes[i]
+			if b == '/' {
+				if i < len(bytes)-1 {
+					v := bytes[i]
+					if v == '/' || v == '*' {
+						i++
+						continue
+					}
+				}
+			} else if b == '*' {
+
+			}
+			//lastByte = b
+			newBytes.WriteByte(b)
+		}
+
+		//var newBytes bytes2.Buffer
+		//for _, b := range bytes {
+		//	if b=='*' || b=='/' {
+		//
+		//	}
+		//	if (lastByte=='/'&&b=='*') || lastByte=='*'&&b=='/'{
+		//		continue
+		//	}
+		//	lastByte = b
+		//	newBytes.WriteByte(b)
+		//}
+
+		//for _, b := range bytes {
+		//
+		//}
+		t.Log(newBytes.String())
+	}
 	t.Log(sta5)
+	t.Log(sta2)
 
 	for _, comment := range sta5.(*Insert).Comments {
 		t.Log(string(comment))
 	}
-	t.Log(sta4.(*Begin).String())
+	t.Log(sta4)
 	checkErr(t, err)
 }
 

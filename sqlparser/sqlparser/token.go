@@ -325,12 +325,12 @@ var keywords = map[string]int{
 // This function is used by go yacc.
 func (tkn *Tokenizer) Lex(lval *yySymType) int {
 	typ, val := tkn.Scan()
-	for typ == COMMENT {
-		if tkn.AllowComments {
-			break
-		}
-		typ, val = tkn.Scan()
-	}
+	//for typ == COMMENT {
+	//if tkn.AllowComments {
+	//	break
+	//}
+	//typ, val = tkn.Scan()
+	//}
 	lval.bytes = val
 	tkn.lastToken = val
 	return typ

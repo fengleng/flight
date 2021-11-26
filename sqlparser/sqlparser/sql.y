@@ -210,7 +210,8 @@ func forceEOF(yylex interface{}) {
 %type <empty> force_eof ddl_force_eof
 %type <str> charset
 %type <convertType> convert_type
-%type <str> show_statement_type
+%type <str> statement_type
+//%type <str> ddl_type
 %start any_command
 
 %%
@@ -361,10 +362,25 @@ set_statement:
     $$ = &Set{Comments: Comments($2), Exprs: $3}
   }
 
+//ddl_type:
+//  ddl_keyword
+//  {
+//    switch v := string($1); v {
+//    case DdlDatabasesStr, DdlTablesStr:
+//      $$ = v
+//    default:
+//      $$ = DdlUnsupportedStr
+//    }
+//  }
+
 create_statement:
   CREATE TABLE not_exists_opt table_name ddl_force_eof
   {
     $$ = &DDL{Action: CreateStr, NewName: $4}
+  }
+| CREATE DATABASE not_exists_opt ID comment_opt ddl_force_eof
+  {
+    $$ = &DbDDL{Comments:Comments($5), Action: CreateStr, DbName: NewNameIdent(string($4))}
   }
 | CREATE constraint_opt INDEX ID using_opt ON table_name ddl_force_eof
   {
@@ -435,7 +451,7 @@ analyze_statement:
     $$ = &DDL{Action: AlterStr, Table: $3, NewName: $3}
   }
 
-show_statement_type:
+statement_type:
   ID
   {
     $$ = ShowUnsupportedStr
@@ -443,7 +459,7 @@ show_statement_type:
 | reserved_keyword
   {
     switch v := string($1); v {
-    case ShowDatabasesStr, ShowTablesStr, ShowKeyspacesStr, ShowShardsStr, ShowVSchemaTablesStr:
+    case ShowDatabasesStr, ShowTablesStr:
       $$ = v
     default:
       $$ = ShowUnsupportedStr
@@ -455,7 +471,7 @@ show_statement_type:
 }
 
 show_statement:
-  SHOW show_statement_type force_eof
+  SHOW statement_type force_eof
   {
     $$ = &Show{Type: $2}
   }
@@ -1841,6 +1857,8 @@ reserved_keyword:
 | WHEN
 | WHERE
 
+//ddl_keyword:
+//  DATABASE
 /*
   These are non-reserved Vitess, because they don't cause conflicts in the grammar.
   Some of them may be reserved in MySQL. The good news is we backtick quote them
@@ -1866,6 +1884,7 @@ non_reserved_keyword:
 | VIEW
 | WITH
 | LAST_INSERT_ID
+
 
 openb:
   '('

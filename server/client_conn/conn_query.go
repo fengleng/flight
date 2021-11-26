@@ -84,6 +84,8 @@ func (c *ClientConn) handleQuery(sql string) (err error) {
 	//	return fmt.Errorf("statement %T not support now", stmt)
 	case *sqlparser.Use:
 		return c.handleUseDB(sqlparser.String(v.DBName))
+	case *sqlparser.DbDDL:
+		return c.handleCreateSchema(v, sql)
 	//case *sqlparser.SimpleSelect:
 	//	return c.handleSimpleSelect(v)
 	//case *sqlparser.Truncate:

@@ -143,6 +143,7 @@ func (*Update) iStatement()        {}
 func (*Delete) iStatement()        {}
 func (*Set) iStatement()           {}
 func (*DDL) iStatement()           {}
+func (*DbDDL) iStatement()         {}
 func (*Show) iStatement()          {}
 func (*Use) iStatement()           {}
 func (*OtherRead) iStatement()     {}
@@ -505,6 +506,59 @@ func (node *Set) WalkSubtree(visit Visit) error {
 		visit,
 		node.Comments,
 		node.Exprs,
+	)
+}
+
+type DbDDL struct {
+	Action       string
+	Comments     Comments
+	DbName       NameIdent
+	NewDbName    NameIdent
+	CharacterSet string
+	Collate      string
+	IfExists     bool
+}
+
+const (
+	DdlDatabasesStr   = "database"
+	DdlTablesStr      = "table"
+	DdlUnsupportedStr = "unsupported"
+)
+
+// Format formats the node.
+func (node *DbDDL) Format(buf *TrackedBuffer) {
+	switch node.Action {
+	case DropStr:
+		exists := "if not exists"
+		if node.IfExists {
+			exists = " if exists"
+		}
+		buf.Myprintf("%s DATABASE %s %v", node.Action, exists, node.DbName)
+	case RenameStr:
+		buf.Myprintf("%s DATABASE %v %v", node.Action, node.DbName, node.NewDbName)
+	default:
+		var charset = ""
+		if node.CharacterSet != "" {
+			charset = fmt.Sprintf("default character set %s", node.CharacterSet)
+			//charset = fmt.Sprintf("default character set %s",node.CharacterSet)
+		}
+		var collate = ""
+		if node.Collate != "" {
+			collate = fmt.Sprintf("default collate %s", node.Collate)
+		}
+		buf.Myprintf("%s DATABASE if not exists %v %s %s", node.Action, node.DbName, charset, collate)
+	}
+}
+
+// WalkSubtree walks the nodes of the subtree.
+func (node *DbDDL) WalkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.DbName,
+		node.NewDbName,
 	)
 }
 
@@ -2630,6 +2684,62 @@ func (node TableIdent) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals from JSON.
 func (node *TableIdent) UnmarshalJSON(b []byte) error {
+	var result string
+	err := json.Unmarshal(b, &result)
+	if err != nil {
+		return err
+	}
+	node.v = result
+	return nil
+}
+
+//NameIdent is a case-sensitive SQL identifier. It will be escaped with
+//backquoted if necessary.
+type NameIdent struct {
+	v string
+}
+
+//NewNameIdent creates a new NameIdent.
+func NewNameIdent(str string) NameIdent {
+	return NameIdent{v: str}
+}
+
+// Format formats the node.
+func (node NameIdent) Format(buf *TrackedBuffer) {
+	formatID(buf, node.v, strings.ToLower(node.v))
+}
+
+// WalkSubtree walks the nodes of the subtree.
+func (node NameIdent) WalkSubtree(visit Visit) error {
+	return nil
+}
+
+// IsEmpty returns true if TabIdent is empty.
+func (node NameIdent) IsEmpty() bool {
+	return node.v == ""
+}
+
+// String returns the unescaped table name. It must
+// not be used for SQL generation. Use sqlparser.String
+// instead. The Stringer conformance is for usage
+// in templates.
+func (node NameIdent) String() string {
+	return node.v
+}
+
+// CompliantName returns a compliant id name
+// that can be used for a bind var.
+func (node NameIdent) CompliantName() string {
+	return compliantName(node.v)
+}
+
+// MarshalJSON marshals into JSON.
+func (node NameIdent) MarshalJSON() ([]byte, error) {
+	return json.Marshal(node.v)
+}
+
+// UnmarshalJSON unmarshals from JSON.
+func (node *NameIdent) UnmarshalJSON(b []byte) error {
 	var result string
 	err := json.Unmarshal(b, &result)
 	if err != nil {
